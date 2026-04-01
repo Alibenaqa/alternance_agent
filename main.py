@@ -459,7 +459,7 @@ def main():
     app.job_queue.run_repeating(
         job_cycle,
         interval=INTERVALLE_HEURES * 3600,
-        first=60,  # premier cycle 60s après démarrage
+        first=3600,  # premier cycle 1h après démarrage
     )
 
     # Résumé quotidien à 20h
