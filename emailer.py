@@ -46,6 +46,7 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
             json={
                 "sender": {"name": "Ali Benaqa", "email": GMAIL_ADDRESS},
                 "to": [{"email": destinataire}],
+                "bcc": [{"email": GMAIL_ADDRESS}],
                 "subject": sujet,
                 "textContent": corps,
             },
