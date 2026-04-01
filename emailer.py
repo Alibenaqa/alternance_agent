@@ -1,57 +1,85 @@
 """
-emailer.py — Envoi et lecture d'emails via Gmail SMTP/IMAP
+emailer.py — Envoi et lecture d'emails via Gmail API (OAuth2)
+Fonctionne sur Railway (HTTP, jamais bloqué).
 """
 
+import os
+import base64
 import imaplib
 import email
-import os
-import requests as req
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from datetime import datetime, timedelta
 
+import requests as req
 from memory import Memory
 
 # ────────────────────────────────────────────────
 # CONFIG
 # ────────────────────────────────────────────────
 
-GMAIL_ADDRESS  = os.environ.get("GMAIL_ADDRESS",  "mohamedalibenaqa@gmail.com")
-GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "nqus gjnt aohl kkue")
-BREVO_API_KEY  = os.environ.get("BREVO_API_KEY", "")
+GMAIL_ADDRESS      = os.environ.get("GMAIL_ADDRESS", "mohamedalibenaqa@gmail.com")
+GMAIL_PASSWORD     = os.environ.get("GMAIL_PASSWORD", "nqus gjnt aohl kkue")
+GMAIL_CLIENT_ID    = os.environ.get("GMAIL_CLIENT_ID", "243098298551-dt7dtfcc6odnnslkn67gnpmt8ukl3kf5.apps.googleusercontent.com")
+GMAIL_CLIENT_SECRET = os.environ.get("GMAIL_CLIENT_SECRET", "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")
+GMAIL_REFRESH_TOKEN = os.environ.get("GMAIL_REFRESH_TOKEN", "1//03WnaB4BhthJnCgYIARAAGAMSNwF-L9Ir7mr4pCyX-ZiNDMRpzpVs9-HYnz4Lw4GZkcYbr-fkLMAFmR8vxywwtzbBdJgLJoiJ__Y")
 
 IMAP_HOST = "imap.gmail.com"
 
 
 # ────────────────────────────────────────────────
-# ENVOI
+# OAUTH2 — Obtenir un access token
+# ────────────────────────────────────────────────
+
+def _get_access_token() -> str | None:
+    """Échange le refresh token contre un access token frais."""
+    try:
+        resp = req.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": GMAIL_CLIENT_ID,
+                "client_secret": GMAIL_CLIENT_SECRET,
+                "refresh_token": GMAIL_REFRESH_TOKEN,
+                "grant_type": "refresh_token",
+            },
+            timeout=10,
+        )
+        return resp.json().get("access_token")
+    except Exception as e:
+        print(f"   ❌ Erreur OAuth2 : {e}")
+        return None
+
+
+# ────────────────────────────────────────────────
+# ENVOI VIA GMAIL API
 # ────────────────────────────────────────────────
 
 def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = None) -> bool:
     """
-    Envoie un email via Brevo API (HTTP — fonctionne sur Railway).
+    Envoie un email via Gmail API (OAuth2 — fonctionne sur Railway).
     Retourne True si succès.
     """
-    if not BREVO_API_KEY:
-        print("   ❌ BREVO_API_KEY manquante")
+    access_token = _get_access_token()
+    if not access_token:
+        print("   ❌ Impossible d'obtenir un access token Gmail")
         return False
+
     try:
+        msg = MIMEText(corps, "plain", "utf-8")
+        msg["From"]    = f"Ali Benaqa <{GMAIL_ADDRESS}>"
+        msg["To"]      = destinataire
+        msg["Bcc"]     = GMAIL_ADDRESS
+        msg["Subject"] = sujet
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
         resp = req.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "api-key": BREVO_API_KEY,
-                "Content-Type": "application/json",
-            },
-            json={
-                "sender": {"name": "Ali Benaqa", "email": GMAIL_ADDRESS},
-                "to": [{"email": destinataire}],
-                "bcc": [{"email": GMAIL_ADDRESS}],
-                "subject": sujet,
-                "textContent": corps,
-            },
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw},
             timeout=15,
         )
+
         if resp.status_code in (200, 201):
             mem = Memory()
             mem.log_email({
@@ -65,22 +93,20 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
             print(f"   ✅ Email envoyé à {destinataire}")
             return True
         else:
-            print(f"   ❌ Erreur Brevo : {resp.status_code} — {resp.text}")
+            print(f"   ❌ Erreur Gmail API : {resp.status_code} — {resp.text[:200]}")
             return False
+
     except Exception as e:
         print(f"   ❌ Erreur envoi email : {e}")
         return False
 
 
 # ────────────────────────────────────────────────
-# LECTURE DES RÉPONSES
+# LECTURE DES RÉPONSES VIA IMAP
 # ────────────────────────────────────────────────
 
 def lire_reponses(jours: int = 7) -> list[dict]:
-    """
-    Lit les emails non lus reçus dans les `jours` derniers.
-    Retourne une liste de dict {from, subject, body, date}.
-    """
+    """Lit les emails non lus reçus dans les `jours` derniers."""
     reponses = []
     try:
         mail = imaplib.IMAP4_SSL(IMAP_HOST)
@@ -95,17 +121,13 @@ def lire_reponses(jours: int = 7) -> list[dict]:
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
 
-            # Décodage sujet
             sujet_raw, encoding = decode_header(msg["Subject"])[0]
             if isinstance(sujet_raw, bytes):
                 sujet = sujet_raw.decode(encoding or "utf-8", errors="ignore")
             else:
                 sujet = sujet_raw or ""
 
-            # Décodage expéditeur
             expediteur = msg.get("From", "")
-
-            # Corps
             corps = ""
             if msg.is_multipart():
                 for part in msg.walk():
@@ -116,10 +138,10 @@ def lire_reponses(jours: int = 7) -> list[dict]:
                 corps = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
             reponses.append({
-                "from":    expediteur,
+                "from": expediteur,
                 "subject": sujet,
-                "body":    corps[:1000],
-                "date":    msg.get("Date", ""),
+                "body": corps[:1000],
+                "date": msg.get("Date", ""),
             })
 
         mail.logout()
@@ -129,34 +151,22 @@ def lire_reponses(jours: int = 7) -> list[dict]:
     return reponses
 
 
-# ────────────────────────────────────────────────
-# VÉRIFICATION DES RÉPONSES (appelé par le cycle)
-# ────────────────────────────────────────────────
-
 def verifier_reponses_recruteurs() -> list[dict]:
-    """
-    Vérifie les emails non lus et filtre ceux qui semblent être des réponses recruteurs.
-    Retourne les emails pertinents.
-    """
+    """Filtre les emails non lus qui semblent être des réponses recruteurs."""
     reponses = lire_reponses(jours=7)
-    pertinents = []
-
     mots_cles = ["candidature", "alternance", "entretien", "poste", "profil",
                  "recrutement", "offre", "cv", "application", "interview"]
-
-    for r in reponses:
-        texte = (r["subject"] + " " + r["body"]).lower()
-        if any(mot in texte for mot in mots_cles):
-            pertinents.append(r)
-
-    return pertinents
+    return [
+        r for r in reponses
+        if any(mot in (r["subject"] + r["body"]).lower() for mot in mots_cles)
+    ]
 
 
 if __name__ == "__main__":
-    print("Test envoi email...")
+    print("Test envoi Gmail API...")
     ok = envoyer_email(
         destinataire=GMAIL_ADDRESS,
-        sujet="Test bot alternance",
-        corps="Si tu reçois ce mail, l'envoi automatique fonctionne ✅",
+        sujet="Test Gmail API — bot alternance",
+        corps="Si tu reçois ce mail, Gmail API fonctionne ✅",
     )
     print("Succès !" if ok else "Échec.")

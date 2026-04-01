@@ -4,3 +4,6 @@ requests==2.33.1
 pypdf==6.9.2
 beautifulsoup4==4.13.4
 playwright==1.51.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-api-python-client==2.166.0
