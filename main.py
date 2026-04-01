@@ -26,6 +26,8 @@ from telegram.ext import (
 
 from scraper_wttj import scraper_wttj
 from scraper_linkedin import scraper_linkedin
+from scraper_indeed import scraper_indeed
+from scraper_hellowork import scraper_hellowork
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from emailer import envoyer_email
@@ -206,6 +208,14 @@ def run_cycle():
         nb_nouvelles += scraper_linkedin()
     except Exception as e:
         log.error(f"Scraping LinkedIn : {e}")
+    try:
+        nb_nouvelles += scraper_indeed()
+    except Exception as e:
+        log.error(f"Scraping Indeed : {e}")
+    try:
+        nb_nouvelles += scraper_hellowork()
+    except Exception as e:
+        log.error(f"Scraping HelloWork : {e}")
 
     try:
         stats = scorer_offres_nouvelles()
