@@ -30,6 +30,7 @@ from scraper_indeed import scraper_indeed
 from scraper_hellowork import scraper_hellowork
 from scraper_labonnealternance import scraper_labonnealternance
 from scraper_france_travail import scraper_france_travail
+from scraper_apec import scraper_apec
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres, alerter_offres_top
 from reponses import run_suivi_candidatures
@@ -228,6 +229,10 @@ def run_cycle():
         nb_nouvelles += scraper_france_travail()
     except Exception as e:
         log.error(f"Scraping France Travail : {e}")
+    try:
+        nb_nouvelles += scraper_apec()
+    except Exception as e:
+        log.error(f"Scraping APEC : {e}")
 
     try:
         stats = scorer_offres_nouvelles()
@@ -370,6 +375,178 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔄 Conversation remise à zéro.")
 
 
+async def cmd_candidatures(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche les dernières candidatures envoyées avec leur statut."""
+    if not _check(update): return
+    mem = Memory()
+    with mem._connect() as conn:
+        cands = conn.execute("""
+            SELECT c.id, c.canal, c.email_dest, c.statut, c.nb_relances,
+                   c.date_candidature, o.titre, o.entreprise, o.statut as statut_offre
+            FROM candidatures c
+            LEFT JOIN offres o ON c.offre_id = o.id
+            ORDER BY c.date_candidature DESC
+            LIMIT 15
+        """).fetchall()
+
+    if not cands:
+        await update.message.reply_text("Aucune candidature envoyée pour l'instant.")
+        return
+
+    icons_statut = {
+        "envoyée":   "📤", "relance": "🔄", "entretien": "🎉",
+        "réponse":   "📬", "refusé":  "❌", "vue":       "👁",
+    }
+    icons_canal = {
+        "email": "📧", "formulaire_web": "🌐",
+        "linkedin_easy_apply": "🔗", "formulaire": "🌐",
+    }
+
+    msg = "📋 <b>Tes candidatures :</b>\n\n"
+    for c in cands:
+        ic = icons_canal.get(c["canal"], "📤")
+        is_ = icons_statut.get(c["statut_offre"] or c["statut"], "📤")
+        date = (c["date_candidature"] or "")[:10]
+        relances = f" ({c['nb_relances']} relance(s))" if c["nb_relances"] else ""
+        msg += (
+            f"{is_} <b>{c['titre'] or '?'}</b> — {c['entreprise'] or '?'}\n"
+            f"   {ic} {c['canal']} | {date}{relances}\n\n"
+        )
+
+    stats = mem.get_stats()
+    msg += (
+        f"─────────────────\n"
+        f"Total : <b>{stats['total_candidatures']}</b> candidatures | "
+        f"<b>{stats['entretiens']}</b> entretiens | "
+        f"Taux réponse : <b>{stats['taux_reponse']}%</b>"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+async def cmd_alumni(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche les alumni Hetic contactés et leur statut."""
+    if not _check(update): return
+    mem = Memory()
+    with mem._connect() as conn:
+        tous = conn.execute("""
+            SELECT prenom, nom, poste_actuel, entreprise,
+                   statut_contact, date_contact, email
+            FROM alumni
+            ORDER BY date_contact DESC NULLS LAST, date_scrape DESC
+            LIMIT 20
+        """).fetchall()
+
+    if not tous:
+        await update.message.reply_text("Aucun alumni trouvé pour l'instant. Lance /cycle pour en chercher.")
+        return
+
+    icons = {
+        "mail envoyé":    "📧",
+        "répondu":        "💬",
+        "relancé":        "🔄",
+        "non contacté":   "⏳",
+    }
+
+    contactes  = [a for a in tous if a["statut_contact"] == "mail envoyé" or a["statut_contact"] == "répondu"]
+    en_attente = [a for a in tous if a["statut_contact"] == "non contacté"]
+
+    msg = f"🎓 <b>Alumni Hetic ({len(tous)} total)</b>\n\n"
+
+    if contactes:
+        msg += f"<b>📧 Contactés ({len(contactes)}) :</b>\n"
+        for a in contactes[:10]:
+            ic = icons.get(a["statut_contact"], "📧")
+            date = (a["date_contact"] or "")[:10]
+            msg += f"  {ic} <b>{a['prenom']} {a['nom']}</b> — {a['poste_actuel'] or ''} @ {a['entreprise']}\n"
+            if date:
+                msg += f"      Contacté le {date}\n"
+
+    if en_attente:
+        msg += f"\n<b>⏳ En attente de contact ({len(en_attente)}) :</b>\n"
+        for a in en_attente[:5]:
+            msg += f"  • {a['prenom']} {a['nom']} — {a['entreprise']}\n"
+
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+async def cmd_relances(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche les candidatures à relancer + bouton pour relancer maintenant."""
+    if not _check(update): return
+    mem = Memory()
+    a_relancer = mem.get_candidatures_a_relancer()
+
+    if not a_relancer:
+        await update.message.reply_text("✅ Aucune relance en attente.")
+        return
+
+    await update.message.reply_text(
+        f"🔄 <b>{len(a_relancer)} candidature(s) à relancer :</b>",
+        parse_mode="HTML"
+    )
+    for c in a_relancer[:8]:
+        texte = (
+            f"🔄 <b>{c.get('titre', '?')}</b> — {c.get('entreprise', '?')}\n"
+            f"📧 {c.get('email_dest', '?')}\n"
+            f"Relances envoyées : {c.get('nb_relances', 0)}/2"
+        )
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📤 Relancer maintenant", callback_data=f"relance_{c['id']}"),
+            InlineKeyboardButton("❌ Ignorer",             callback_data=f"skip_relance_{c['id']}"),
+        ]])
+        await update.message.reply_text(texte, parse_mode="HTML", reply_markup=kb)
+
+
+async def cmd_entretiens(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche les offres en statut entretien."""
+    if not _check(update): return
+    mem = Memory()
+    with mem._connect() as conn:
+        entretiens = conn.execute("""
+            SELECT o.titre, o.entreprise, o.notes, o.url,
+                   c.date_candidature, c.email_dest
+            FROM offres o
+            LEFT JOIN candidatures c ON c.offre_id = o.id
+            WHERE o.statut = 'entretien'
+            ORDER BY c.date_candidature DESC
+        """).fetchall()
+
+    if not entretiens:
+        await update.message.reply_text("Aucun entretien pour l'instant. Ça va venir 💪")
+        return
+
+    msg = f"🎉 <b>{len(entretiens)} entretien(s) !</b>\n\n"
+    for e in entretiens:
+        msg += (
+            f"🏢 <b>{e['entreprise']}</b> — {e['titre']}\n"
+            f"📝 {e['notes'] or 'Pas de notes'}\n"
+            f"🔗 <a href=\"{e['url']}\">Voir l'offre</a>\n\n"
+        )
+    await update.message.reply_text(msg, parse_mode="HTML", disable_web_page_preview=True)
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche toutes les commandes disponibles."""
+    if not _check(update): return
+    msg = (
+        "🤖 <b>Commandes disponibles :</b>\n\n"
+        "📋 <b>Recherche</b>\n"
+        "/offres — Top 10 offres intéressantes\n"
+        "/stats — Statistiques globales\n"
+        "/cycle — Lancer un cycle maintenant\n\n"
+        "📤 <b>Candidatures</b>\n"
+        "/candidatures — Toutes tes candidatures\n"
+        "/relances — Candidatures à relancer\n"
+        "/entretiens — Entretiens obtenus 🎉\n\n"
+        "🎓 <b>Alumni</b>\n"
+        "/alumni — Alumni Hetic contactés\n\n"
+        "⚙️ <b>Autre</b>\n"
+        "/reset — Réinitialiser la conversation\n"
+        "/help — Cette aide\n\n"
+        "💬 Tu peux aussi m'écrire librement !"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _check(update): return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -497,6 +674,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text("❌ Annulé.")
 
+    elif data.startswith("relance_"):
+        from reponses import envoyer_relances_auto
+        cand_id = int(data[8:])
+        with mem._connect() as conn:
+            cand = conn.execute("SELECT * FROM candidatures WHERE id = ?", (cand_id,)).fetchone()
+            if cand:
+                offre = conn.execute("SELECT * FROM offres WHERE id = ?", (cand["offre_id"],)).fetchone()
+        if cand and offre:
+            from emailer import envoyer_email
+            from reponses import _generer_email_relance
+            email_data = _generer_email_relance(dict(offre), dict(cand))
+            ok = envoyer_email(dict(cand)["email_dest"], email_data["objet"], email_data["corps"])
+            if ok:
+                with mem._connect() as conn:
+                    conn.execute("""
+                        UPDATE candidatures SET nb_relances = nb_relances + 1,
+                        date_relance = datetime('now', '+7 days'), statut = 'relance'
+                        WHERE id = ?
+                    """, (cand_id,))
+                await query.edit_message_reply_markup(reply_markup=None)
+                await query.message.reply_text(f"✅ Relance envoyée à {dict(cand)['email_dest']}")
+            else:
+                await query.message.reply_text("❌ Erreur envoi relance.")
+
+    elif data.startswith("skip_relance_"):
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("⏭️ Relance ignorée.")
+
 
 # ────────────────────────────────────────────────
 # MAIN
@@ -509,11 +714,16 @@ def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     # Handlers
-    app.add_handler(CommandHandler("start",  cmd_start))
-    app.add_handler(CommandHandler("offres", cmd_offres))
-    app.add_handler(CommandHandler("stats",  cmd_stats))
-    app.add_handler(CommandHandler("cycle",  cmd_cycle))
-    app.add_handler(CommandHandler("reset",  cmd_reset))
+    app.add_handler(CommandHandler("start",        cmd_start))
+    app.add_handler(CommandHandler("offres",       cmd_offres))
+    app.add_handler(CommandHandler("stats",        cmd_stats))
+    app.add_handler(CommandHandler("cycle",        cmd_cycle))
+    app.add_handler(CommandHandler("reset",        cmd_reset))
+    app.add_handler(CommandHandler("candidatures", cmd_candidatures))
+    app.add_handler(CommandHandler("alumni",       cmd_alumni))
+    app.add_handler(CommandHandler("relances",     cmd_relances))
+    app.add_handler(CommandHandler("entretiens",   cmd_entretiens))
+    app.add_handler(CommandHandler("help",         cmd_help))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))

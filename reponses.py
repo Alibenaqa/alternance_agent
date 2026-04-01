@@ -39,6 +39,22 @@ def _telegram(texte: str):
 # ANALYSE CLAUDE D'UNE RÉPONSE RECRUTEUR
 # ────────────────────────────────────────────────
 
+def _extraire_date_entretien(texte: str) -> str | None:
+    """Extrait une date/heure d'entretien depuis un texte via regex."""
+    import re
+    patterns = [
+        r'\b(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\b',          # 15/04/2026
+        r'\b(\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+\d{4})\b',
+        r'\b(lundi|mardi|mercredi|jeudi|vendredi)\s+\d{1,2}\s+\w+',
+        r'\b(\d{1,2}h(?:\d{2})?)\b',                              # 14h00
+    ]
+    for p in patterns:
+        m = re.search(p, texte, re.IGNORECASE)
+        if m:
+            return m.group(0)
+    return None
+
+
 def analyser_reponse(email: dict) -> dict:
     """
     Claude analyse un email recruteur.
@@ -157,6 +173,11 @@ def traiter_reponses_recruteurs() -> int:
             mem.update_offre_statut(offre["id"], analyse["statut_offre"], analyse.get("resume", ""))
             print(f"   ✅ Offre mise à jour → {analyse['statut_offre']}")
 
+        # Détection date d'entretien
+        date_entretien = None
+        if type_rep == "entretien":
+            date_entretien = _extraire_date_entretien(email.get("body", "") + email.get("subject", ""))
+
         # Notification Telegram
         msg = (
             f"{icon} <b>Réponse recruteur !</b>\n\n"
@@ -167,6 +188,9 @@ def traiter_reponses_recruteurs() -> int:
 
         if offre:
             msg += f"\n<b>Offre :</b> {offre.get('titre', '')} chez {offre.get('entreprise', '')}\n"
+
+        if date_entretien:
+            msg += f"\n📅 <b>Date détectée : {date_entretien}</b> — Pense à confirmer !\n"
 
         if analyse.get("suggestion_reponse"):
             msg += (
