@@ -46,20 +46,38 @@ def generer_email_candidature(offre: dict) -> dict:
     r = profil["recherche_alternance"]
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    prompt = f"""Rédige un email de candidature percutant pour Ali Benaqa.
+    prompt = f"""Rédige un email de candidature percutant et personnalisé pour Ali Benaqa.
 
-PROFIL ALI :
+PROFIL COMPLET D'ALI :
 - Formation : Bachelor Data & IA — Hetic, Grande École de la Tech (Montreuil)
 - Niveau actuel : Bac+2, sera en Bac+3 à partir d'octobre 2026
-- Disponibilité alternance : {r['disponibilite']} pour {r['duree_contrat']}
-- Rythme : 3 jours entreprise / 2 jours école
-- Expériences :
-  * Data Analyst freelance chez Techwin (mars-juin 2025) : ETL, pipelines Python, SQL
-  * Reporting Analyst stage chez Mamda Assurance (avr-août 2024) : Power BI, PHP, MySQL
-  * Data Analyst chez BNC Corporation (sept 2023-avr 2024) : KPI, tableaux de bord, EViews
-- Stack : Python, SQL, Power BI, ETL, API REST, Machine Learning, Node.js, React
-- Projet notable : agent IA autonome en Python (scraping, Claude API, Telegram Bot)
-- Langues : français bilingue, anglais B2
+- Disponibilité : {r['disponibilite']} | Durée : {r['duree_contrat']} | Rythme : 3j entreprise / 2j école
+
+EXPÉRIENCES :
+  1. Data Analyst freelance — Techwin Services (mars-juin 2025)
+     → Pipelines ETL Python, traitement données hétérogènes (CSV, SQL, API), pipelines automatisés
+  2. Reporting Analyst (stage) — Mamda Assurance Maroc (avr-août 2024)
+     → Apps web PHP/MySQL, reporting automatisé Power BI, optimisation interfaces data
+  3. Data Analyst — BNC Corporation Maroc (sept 2023-avr 2024)
+     → KPI commerciaux, tableaux de bord Power BI hebdo/mensuels, analyses EViews/Excel
+
+PROJETS :
+  - Agent IA autonome de recherche d'alternance (Python, Claude API, Playwright, Telegram, SQLite)
+  - Bot Discord IA interactif (Node.js, ChatGPT API)
+  - Site cinéma Espace des Arts, page live Betclic (UI/UX, HTML/CSS/JS)
+  - Application de vote avec analyse données (Python, SQL)
+
+COMPÉTENCES :
+  - Data : Python, SQL, Power BI, ETL, EViews, pipelines de données, KPI
+  - IA/ML : Claude API, ChatGPT API, intégration LLM, Make/Zapier, automatisation
+  - Dev : JavaScript, Node.js, React, PHP, HTML/CSS, Express.js
+  - Bases de données : MySQL, PostgreSQL, MongoDB
+  - Outils : Git/GitHub, Docker (bases), Postman, Jira, GitHub Actions
+  - Langues : français bilingue, anglais B2/C1
+
+LIENS :
+  - GitHub : https://github.com/Alibenaqa
+  - LinkedIn : https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/
 
 OFFRE CIBLÉE :
 - Poste : {offre['titre']}
@@ -68,17 +86,23 @@ OFFRE CIBLÉE :
 - Description : {(offre.get('description') or 'Non précisée')[:800]}
 
 INSTRUCTIONS :
-- Style : professionnel mais humain, direct, pas de langue de bois
-- Longueur : 160-200 mots exactement
-- Commence directement par l'accroche, pas de "Madame, Monsieur" générique
-- Adapte le contenu au TYPE de poste (Data Scientist → ML/modèles, Data Engineer → ETL/pipelines, AI Developer → IA/LLM, Dev Web → React/Node)
-- Si l'offre demande Bac+3 : mentionne naturellement "à partir d'octobre 2026, je serai en 3e année (Bac+3)"
-- Met en avant 2 expériences spécifiques en lien direct avec CE poste
-- Mentionne le projet agent IA si pertinent (montre l'initiative)
-- Termine par une demande d'entretien concrète
+- Style : professionnel mais humain, direct, original — pas de langue de bois
+- Longueur : 200-250 mots
+- Commence par une accroche forte et personnalisée (pas "Madame, Monsieur" générique)
+- Adapte le contenu au TYPE de poste :
+  * Data Scientist/ML → met en avant Python, pipelines, Claude API, agent IA
+  * Data Engineer → met en avant ETL, pipelines, SQL, automatisation
+  * AI Developer/IA → met en avant agent IA, LLM API, automatisation, bots
+  * Dev Web → met en avant React, Node.js, JavaScript, projets web
+  * Data Analyst → met en avant Power BI, KPI, tableaux de bord, EViews
+- Si l'offre demande Bac+3 : mentionne "dès octobre 2026 je serai en 3e année (Bac+3)"
+- Met en avant 2-3 éléments concrets du profil en lien direct avec CE poste
+- Avant la signature, ajoute ce paragraphe EXACTEMENT :
+  "PS : Ce message a été rédigé et envoyé par l'agent IA que j'ai développé pour automatiser ma recherche d'alternance. Pour plus de détails sur mon profil : GitHub → https://github.com/Alibenaqa | LinkedIn → https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/ | Mon CV est joint à cet email."
+- Signature : "Ali Benaqa | +33 6 67 67 79 37 | alibenaqa123@gmail.com"
 - Réponds avec ce format exact :
 
-OBJET: [sujet court et percutant]
+OBJET: [sujet court et percutant, max 60 caractères]
 ---
 [corps de l'email]"""
 

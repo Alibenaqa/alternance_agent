@@ -8,11 +8,17 @@ import base64
 import imaplib
 import email
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.application import MIMEApplication
 from email.header import decode_header
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests as req
 from memory import Memory
+
+CV_PATH = Path(__file__).parent / "cv_ali.pdf"
 
 # ────────────────────────────────────────────────
 # CONFIG
@@ -65,11 +71,20 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
         return False
 
     try:
-        msg = MIMEText(corps, "plain", "utf-8")
+        msg = MIMEMultipart()
         msg["From"]    = f"Ali Benaqa <{GMAIL_ADDRESS}>"
         msg["To"]      = destinataire
         msg["Bcc"]     = GMAIL_ADDRESS
         msg["Subject"] = sujet
+
+        msg.attach(MIMEText(corps, "plain", "utf-8"))
+
+        # Pièce jointe CV PDF
+        if CV_PATH.exists():
+            with open(CV_PATH, "rb") as f:
+                cv_part = MIMEApplication(f.read(), _subtype="pdf")
+                cv_part.add_header("Content-Disposition", "attachment", filename="CV_Ali_Benaqa.pdf")
+                msg.attach(cv_part)
 
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
 
