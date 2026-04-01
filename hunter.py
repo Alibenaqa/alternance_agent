@@ -71,20 +71,66 @@ def trouver_email_recruteur(entreprise: str, domaine: str = None) -> dict | None
 
 
 def trouver_domaine(entreprise: str) -> str | None:
-    """Trouve le domaine web d'une entreprise via Hunter."""
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/companies/suggest",
-            params={"query": entreprise, "api_key": HUNTER_API_KEY},
-            timeout=10,
-        )
-        suggestions = resp.json().get("data", {}).get("companies", [])
-        if suggestions:
-            return suggestions[0].get("domain")
-        return None
-    except Exception as e:
-        print(f"   ❌ Hunter suggest : {e}")
-        return None
+    """Devine le domaine web d'une entreprise."""
+    # Dictionnaire des entreprises fréquentes
+    DOMAINES_CONNUS = {
+        "capgemini": "capgemini.com",
+        "sopra": "soprasteria.com",
+        "sopra steria": "soprasteria.com",
+        "accenture": "accenture.com",
+        "thales": "thalesgroup.com",
+        "bnp paribas": "bnpparibas.com",
+        "bnpparibas": "bnpparibas.com",
+        "société générale": "societegenerale.com",
+        "axa": "axa.com",
+        "allianz": "allianz.fr",
+        "grdf": "grdf.fr",
+        "edf": "edf.fr",
+        "orange": "orange.com",
+        "sncf": "sncf.com",
+        "airbus": "airbus.com",
+        "dassault": "dassault-systemes.com",
+        "michelin": "michelin.com",
+        "total": "totalenergies.com",
+        "totalenergies": "totalenergies.com",
+        "lvmh": "lvmh.com",
+        "l'oréal": "loreal.com",
+        "loreal": "loreal.com",
+        "danone": "danone.com",
+        "sanofi": "sanofi.com",
+        "boursobank": "boursobank.com",
+        "bforbank": "bforbank.com",
+        "canal+": "canalplus.com",
+        "canal plus": "canalplus.com",
+        "chanel": "chanel.com",
+        "hermes": "hermes.com",
+        "hermès": "hermes.com",
+        "lacoste": "lacoste.com",
+        "dior": "dior.com",
+        "christian dior": "dior.com",
+        "volkswagen": "vwfs.fr",
+        "samsung": "samsung.com",
+        "servier": "servier.com",
+        "bpce": "bpce.fr",
+        "klesia": "klesia.fr",
+        "sgeti": "sogeti.fr",
+        "sogeti": "sogeti.fr",
+        "upsa": "upsa.fr",
+        "juridica": "juridica.fr",
+        "affluences": "affluences.com",
+        "aon": "aon.com",
+    }
+
+    nom = entreprise.lower().strip()
+    for cle, domaine in DOMAINES_CONNUS.items():
+        if cle in nom or nom in cle:
+            return domaine
+
+    # Fallback : construit un domaine probable
+    nom_propre = entreprise.lower()
+    for car in [" ", "'", "-", ".", ","]:
+        nom_propre = nom_propre.replace(car, "")
+    return f"{nom_propre}.com"
 
 
 def verifier_email(email: str) -> bool:
