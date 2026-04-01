@@ -29,6 +29,7 @@ from scraper_linkedin import scraper_linkedin
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from emailer import envoyer_email
+from candidater import run_candidatures_auto, envoyer_resume_quotidien
 from memory import Memory
 
 # ────────────────────────────────────────────────
@@ -210,9 +211,17 @@ def run_cycle():
         log.error(f"Notifs : {e}")
         nb_notifs = 0
 
+    try:
+        cand_stats = run_candidatures_auto()
+        nb_cands = cand_stats["email"] + cand_stats["formulaire"]
+    except Exception as e:
+        log.error(f"Candidatures : {e}")
+        nb_cands = 0
+
     resume = (
         f"✅ <b>Cycle terminé</b>\n"
-        f"📡 Nouvelles : {nb_nouvelles} | ✅ Intéressantes : {stats['interessantes']} | 📲 Notifs : {nb_notifs}"
+        f"📡 Nouvelles : {nb_nouvelles} | ✅ Intéressantes : {stats['interessantes']}\n"
+        f"📤 Candidatures envoyées : {nb_cands} | 📲 Notifs : {nb_notifs}"
     )
     _telegram_send(resume)
     log.info(f"Cycle terminé — {nb_nouvelles} nouvelles, {stats['interessantes']} intéressantes")
@@ -223,6 +232,13 @@ async def job_cycle(context: ContextTypes.DEFAULT_TYPE):
     import asyncio
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, run_cycle)
+
+
+async def job_resume_quotidien(context: ContextTypes.DEFAULT_TYPE):
+    """Résumé quotidien à 20h."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, envoyer_resume_quotidien)
 
 
 # ────────────────────────────────────────────────
@@ -444,6 +460,12 @@ def main():
         job_cycle,
         interval=INTERVALLE_HEURES * 3600,
         first=60,  # premier cycle 60s après démarrage
+    )
+
+    # Résumé quotidien à 20h
+    app.job_queue.run_daily(
+        job_resume_quotidien,
+        time=datetime.strptime("20:00", "%H:%M").time(),
     )
 
     log.info(f"🤖 Bot démarré — cycle auto toutes les {INTERVALLE_HEURES}h")
