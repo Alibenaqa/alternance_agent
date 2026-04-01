@@ -38,7 +38,12 @@ MOTS_CLES = [
     "Data Engineer",
     "Machine Learning",
     "AI Engineer",
+    "AI Developer",
+    "Développeur IA",
     "Business Intelligence",
+    "MLOps",
+    "Développeur Full Stack",
+    "Développeur Web",
 ]
 
 # Villes acceptées (None = toute la France)

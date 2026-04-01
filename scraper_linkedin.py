@@ -21,6 +21,10 @@ MOTS_CLES = [
     "Data Engineer alternance",
     "Machine Learning alternance",
     "AI Engineer alternance",
+    "AI Developer alternance",
+    "Développeur IA alternance",
+    "MLOps alternance",
+    "Développeur Full Stack alternance",
 ]
 
 HEADERS = {

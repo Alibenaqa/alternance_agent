@@ -46,31 +46,41 @@ def generer_email_candidature(offre: dict) -> dict:
     r = profil["recherche_alternance"]
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    prompt = f"""Rédige un email de candidature pour Ali Benaqa.
+    prompt = f"""Rédige un email de candidature percutant pour Ali Benaqa.
 
 PROFIL ALI :
-- Formation : Bachelor Data & IA — Hetic (3e année, oct 2026)
-- Expériences : Data Analyst chez Techwin et BNC Corporation, Stage Mamda Assurance
-- Stack : Python, SQL, Power BI, ETL, API REST, Machine Learning
-- Disponibilité : {r['disponibilite']} | Durée : {r['duree_contrat']}
+- Formation : Bachelor Data & IA — Hetic, Grande École de la Tech (Montreuil)
+- Niveau actuel : Bac+2, sera en Bac+3 à partir d'octobre 2026
+- Disponibilité alternance : {r['disponibilite']} pour {r['duree_contrat']}
+- Rythme : 3 jours entreprise / 2 jours école
+- Expériences :
+  * Data Analyst freelance chez Techwin (mars-juin 2025) : ETL, pipelines Python, SQL
+  * Reporting Analyst stage chez Mamda Assurance (avr-août 2024) : Power BI, PHP, MySQL
+  * Data Analyst chez BNC Corporation (sept 2023-avr 2024) : KPI, tableaux de bord, EViews
+- Stack : Python, SQL, Power BI, ETL, API REST, Machine Learning, Node.js, React
+- Projet notable : agent IA autonome en Python (scraping, Claude API, Telegram Bot)
+- Langues : français bilingue, anglais B2
 
 OFFRE CIBLÉE :
 - Poste : {offre['titre']}
 - Entreprise : {offre['entreprise']}
 - Localisation : {offre['localisation']}
-- Description : {(offre.get('description') or 'N/A')[:600]}
+- Description : {(offre.get('description') or 'Non précisée')[:800]}
 
 INSTRUCTIONS :
-- Style : professionnel mais naturel, direct
-- Longueur : 150-180 mots max
-- Met en avant 2-3 expériences data pertinentes pour CE poste
-- Mentionne Hetic (école reconnue data/IA)
-- Termine par une phrase d'appel à l'action (entretien)
+- Style : professionnel mais humain, direct, pas de langue de bois
+- Longueur : 160-200 mots exactement
+- Commence directement par l'accroche, pas de "Madame, Monsieur" générique
+- Adapte le contenu au TYPE de poste (Data Scientist → ML/modèles, Data Engineer → ETL/pipelines, AI Developer → IA/LLM, Dev Web → React/Node)
+- Si l'offre demande Bac+3 : mentionne naturellement "à partir d'octobre 2026, je serai en 3e année (Bac+3)"
+- Met en avant 2 expériences spécifiques en lien direct avec CE poste
+- Mentionne le projet agent IA si pertinent (montre l'initiative)
+- Termine par une demande d'entretien concrète
 - Réponds avec ce format exact :
 
-OBJET: [sujet de l'email ici]
+OBJET: [sujet court et percutant]
 ---
-[corps de l'email ici]"""
+[corps de l'email]"""
 
     try:
         resp = client.messages.create(

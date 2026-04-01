@@ -39,15 +39,17 @@ def resumer_profil(profil: dict) -> str:
     f = profil["formation"]
     return f"""
 Candidat : {profil['identite']['prenom']} {profil['identite']['nom']}
-Formation : {f['diplome']} — {f['ecole']} (3e année)
+Formation : {f['diplome']} — {f['ecole']}
+Niveau actuel : Bac+2 | Sera en Bac+3 à partir d'octobre 2026
 Début alternance : {r['disponibilite']} | Durée : {r['duree_contrat']}
 Rythme : {f['rythme_souhaite']}
 Postes ciblés : {', '.join(r['poste_cible'])}
 Secteurs préférés : {', '.join(r['secteurs_preferes'])}
 Localisation : {', '.join(r['localisation'])}
 Salaire minimum : {r['salaire_minimum_mensuel']}€/mois
-Compétences clés : Python, SQL, Power BI, ETL, API REST, Machine Learning
+Compétences clés : Python, SQL, Power BI, ETL, API REST, Machine Learning, Node.js, React
 Expériences : Data Analyst (Techwin Services, BNC Corporation), Stage Mamda Assurance
+NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 dès oct 2026
 """.strip()
 
 
@@ -73,10 +75,12 @@ Description : {offre['description'][:1500] if offre['description'] else 'Non dis
 
 === TÂCHE ===
 Donne un score de pertinence entre 0.0 et 1.0 selon ces critères :
-- 0.9-1.0 : Parfaitement aligné (poste data/IA, Paris/IDF, alternance, bon niveau)
+- 0.9-1.0 : Parfaitement aligné (poste data/IA/dev web, Paris/IDF, alternance, Bac+3 ou ouvert)
 - 0.7-0.8 : Très bon match (quelques différences mineures)
 - 0.5-0.6 : Match moyen (poste connexe ou localisation éloignée)
-- 0.0-0.4 : Mauvais match (hors domaine, hors zone, ou trop senior/junior)
+- 0.0-0.4 : Mauvais match (hors domaine, hors zone, ou trop senior)
+BONUS +0.05 : si l'offre mentionne explicitement Bac+3 ou Master 1 (Ali sera en Bac+3 dès oct 2026)
+MALUS -0.1 : si l'offre exige Bac+4/5 ou Master 2 minimum
 
 Réponds en JSON :
 {{

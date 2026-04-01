@@ -17,7 +17,9 @@
     "lieu": "Montreuil, France",
     "diplome": "Bachelor Data & Intelligence Artificielle",
     "programme": "Programme Grande École de la Tech",
-    "annee_actuelle": 3,
+    "annee_actuelle": 2,
+    "niveau_actuel": "Bac+2 (Bachelor 2e année Data & IA)",
+    "niveau_rentree_2026": "Bac+3 (Bachelor 3e année — à partir d'octobre 2026)",
     "date_debut_alternance": "Octobre 2026",
     "duree_contrat": "12 à 36 mois",
     "rythme_souhaite": "3 jours entreprise / 2 jours école",
@@ -158,10 +160,14 @@
     "poste_cible": [
       "Data Analyst",
       "Data Scientist",
+      "Data Engineer",
       "ML Engineer",
       "AI Engineer",
-      "Data Engineer",
-      "Business Intelligence Analyst"
+      "AI Developer",
+      "Développeur IA",
+      "Développeur Web Full-Stack",
+      "Business Intelligence Analyst",
+      "MLOps Engineer"
     ],
     "secteurs_preferes": [
       "Tech / Startup",
