@@ -293,15 +293,30 @@ def candidater_wttj(offre: dict, mem: Memory) -> bool:
 # CYCLE CANDIDATURES AUTOMATIQUES
 # ────────────────────────────────────────────────
 
+def _entreprise_deja_contactee(entreprise: str, mem: Memory, jours: int = 30) -> bool:
+    """Vérifie si on a déjà postulé à cette entreprise dans les X derniers jours."""
+    if not entreprise:
+        return False
+    with mem._connect() as conn:
+        row = conn.execute("""
+            SELECT 1 FROM candidatures c
+            JOIN offres o ON c.offre_id = o.id
+            WHERE LOWER(o.entreprise) = LOWER(?)
+              AND c.date_candidature >= datetime('now', ?)
+        """, (entreprise.strip(), f"-{jours} days")).fetchone()
+    return row is not None
+
+
 def run_candidatures_auto() -> dict:
     """
     Postule automatiquement aux offres intéressantes non postulées.
     Retourne les stats du cycle.
     """
+    from turso_sync import deja_postule_turso
+
     mem = Memory()
     offres = mem.get_offres_non_postulees(score_min=SCORE_MIN_AUTO)
     print(f"\n🤖 Candidatures auto — {len(offres)} offres éligibles (score>={SCORE_MIN_AUTO})")
-    print(f"   BREVO_API_KEY présente : {'✅' if BREVO_API_KEY else '❌ MANQUANTE'}")
     offres = offres[:MAX_CANDIDATURES]
 
     stats = {"email": 0, "formulaire": 0, "echecs": 0, "total": len(offres)}
@@ -309,6 +324,18 @@ def run_candidatures_auto() -> dict:
 
     for offre in offres:
         print(f"\n➡️  {offre['titre']} — {offre['entreprise']} ({int(offre['score_pertinence']*100)}%)")
+
+        # ── Protection 1 : vérification Turso (source de vérité) ──
+        if deja_postule_turso(offre["url"]):
+            print(f"   ⏭️  Déjà postulé (Turso) — skip")
+            mem.update_offre_statut(offre["id"], "postulé", "Déjà postulé (Turso sync)")
+            continue
+
+        # ── Protection 2 : même entreprise dans les 30 derniers jours ──
+        if _entreprise_deja_contactee(offre["entreprise"], mem):
+            print(f"   ⏭️  {offre['entreprise']} déjà contacté récemment — skip")
+            mem.update_offre_statut(offre["id"], "ignoré", "Entreprise déjà contactée ce mois")
+            continue
 
         # Tentative 1 : email via Hunter.io
         ok = candidater_par_email(offre, mem)

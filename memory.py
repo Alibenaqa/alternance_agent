@@ -172,7 +172,7 @@ class Memory:
         with self._connect() as conn:
             cur = conn.execute(sql, {
                 "source": offre.get("source", ""),
-                "url": offre["url"],
+                "url": self._normaliser_url(offre["url"]),
                 "titre": offre.get("titre", ""),
                 "entreprise": offre.get("entreprise", ""),
                 "localisation": offre.get("localisation", ""),
@@ -215,9 +215,24 @@ class Memory:
         with self._connect() as conn:
             conn.execute("UPDATE offres SET notif_envoyee = 1 WHERE id = ?", (offre_id,))
 
+    @staticmethod
+    def _normaliser_url(url: str) -> str:
+        """Normalise une URL pour éviter les faux doublons (tracking params, slash final...)."""
+        from urllib.parse import urlparse, urlunparse
+        try:
+            p = urlparse(url)
+            # Retire les paramètres de tracking courants
+            path = p.path.rstrip("/")
+            return urlunparse((p.scheme, p.netloc.lower(), path, "", "", ""))
+        except Exception:
+            return url.split("?")[0].rstrip("/")
+
     def offre_existe(self, url: str) -> bool:
+        url_norm = self._normaliser_url(url)
         with self._connect() as conn:
-            row = conn.execute("SELECT 1 FROM offres WHERE url = ?", (url,)).fetchone()
+            row = conn.execute(
+                "SELECT 1 FROM offres WHERE url = ? OR url = ?", (url, url_norm)
+            ).fetchone()
         return row is not None
 
     # ────────────────────────────────────────────────────────────
