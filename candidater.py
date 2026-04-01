@@ -27,6 +27,7 @@ def _telegram(texte: str):
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 TELEGRAM_TOKEN    = os.environ.get("TELEGRAM_TOKEN", "8658482373:AAH3Oxk6of_JWCVXRBXn_L4X9cIaHHMcDrc")
 TELEGRAM_CHAT_ID  = os.environ.get("TELEGRAM_CHAT_ID", "7026975488")
+BREVO_API_KEY     = os.environ.get("BREVO_API_KEY", "")
 PROFIL_PATH       = Path(__file__).parent / "profil_ali.json"
 
 SCORE_MIN_AUTO    = 0.75   # Score minimum pour candidature automatique
@@ -265,12 +266,12 @@ def run_candidatures_auto() -> dict:
     """
     mem = Memory()
     offres = mem.get_offres_non_postulees(score_min=SCORE_MIN_AUTO)
-    offres = offres[:MAX_CANDIDATURES]  # limite de sécurité
+    print(f"\n🤖 Candidatures auto — {len(offres)} offres éligibles (score>={SCORE_MIN_AUTO})")
+    print(f"   BREVO_API_KEY présente : {'✅' if BREVO_API_KEY else '❌ MANQUANTE'}")
+    offres = offres[:MAX_CANDIDATURES]
 
     stats = {"email": 0, "formulaire": 0, "echecs": 0, "total": len(offres)}
     candidatures_envoyees = []
-
-    print(f"\n🤖 Candidatures auto — {len(offres)} offres à traiter...")
 
     for offre in offres:
         print(f"\n➡️  {offre['titre']} — {offre['entreprise']} ({int(offre['score_pertinence']*100)}%)")
