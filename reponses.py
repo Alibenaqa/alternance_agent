@@ -202,6 +202,21 @@ def traiter_reponses_recruteurs() -> int:
             msg += "\n⚡ <b>À traiter rapidement !</b>"
 
         _telegram(msg)
+
+        # Si entretien détecté → ajoute au calendrier iCloud
+        if type_rep == "entretien":
+            try:
+                from calendrier import planifier_entretien
+                entreprise = offre.get("entreprise", "") if offre else email.get("from", "")
+                poste      = offre.get("titre", "") if offre else email.get("subject", "")
+                planifier_entretien(
+                    entreprise=entreprise,
+                    poste=poste,
+                    texte_email=email.get("body", "") + " " + email.get("subject", ""),
+                )
+            except Exception as e:
+                print(f"   ⚠️  Calendrier : {e}")
+
         nb_traites += 1
 
     print(f"   ✅ {nb_traites} réponse(s) traitée(s)")
