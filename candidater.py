@@ -16,6 +16,14 @@ from memory import Memory
 from hunter import trouver_email_recruteur
 from emailer import envoyer_email
 
+
+def _telegram(texte: str):
+    req.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": texte, "parse_mode": "HTML"},
+        timeout=10,
+    )
+
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 TELEGRAM_TOKEN    = os.environ.get("TELEGRAM_TOKEN", "8658482373:AAH3Oxk6of_JWCVXRBXn_L4X9cIaHHMcDrc")
 TELEGRAM_CHAT_ID  = os.environ.get("TELEGRAM_CHAT_ID", "7026975488")
@@ -127,6 +135,17 @@ def candidater_par_email(offre: dict, mem: Memory) -> bool:
             "date_relance": "datetime('now', '+7 days')",
         })
         mem.update_offre_statut(offre["id"], "postulé", f"Email envoyé à {email_rh}")
+
+        # Notification Telegram
+        notif = (
+            f"✅ <b>J'ai postulé !</b>\n\n"
+            f"🏢 <b>{offre['entreprise']}</b> — {offre['titre']}\n"
+            f"📧 Mail envoyé à : <code>{email_rh}</code>\n\n"
+            f"<b>Objet :</b> {email_data['objet']}\n\n"
+            f"<b>Mail envoyé :</b>\n{email_data['corps'][:600]}\n\n"
+            f"Tu en penses quoi ? 👆"
+        )
+        _telegram(notif)
         return True
 
     return False
@@ -215,6 +234,16 @@ def candidater_wttj(offre: dict, mem: Memory) -> bool:
             "corps_email": "",
         })
         mem.update_offre_statut(offre["id"], "postulé", "Via formulaire WTTJ")
+
+        # Notification Telegram
+        notif = (
+            f"✅ <b>J'ai postulé !</b>\n\n"
+            f"🏢 <b>{offre['entreprise']}</b> — {offre['titre']}\n"
+            f"🌐 Via formulaire WTTJ\n"
+            f"🔗 {offre['url']}\n\n"
+            f"CV envoyé directement sur leur plateforme 📄"
+        )
+        _telegram(notif)
         return True
 
     except ImportError:
