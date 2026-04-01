@@ -19,7 +19,7 @@ from memory import Memory
 
 GMAIL_ADDRESS  = os.environ.get("GMAIL_ADDRESS",  "mohamedalibenaqa@gmail.com")
 GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "nqus gjnt aohl kkue")
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+BREVO_API_KEY  = os.environ.get("BREVO_API_KEY", "")
 
 IMAP_HOST = "imap.gmail.com"
 
@@ -30,25 +30,24 @@ IMAP_HOST = "imap.gmail.com"
 
 def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = None) -> bool:
     """
-    Envoie un email via Resend API (HTTP — fonctionne sur Railway).
+    Envoie un email via Brevo API (HTTP — fonctionne sur Railway).
     Retourne True si succès.
     """
-    if not RESEND_API_KEY:
-        print("   ❌ RESEND_API_KEY manquante")
+    if not BREVO_API_KEY:
+        print("   ❌ BREVO_API_KEY manquante")
         return False
     try:
         resp = req.post(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "api-key": BREVO_API_KEY,
                 "Content-Type": "application/json",
             },
             json={
-                "from": f"Ali Benaqa <onboarding@resend.dev>",
-                "to": [destinataire],
-                "reply_to": GMAIL_ADDRESS,
+                "sender": {"name": "Ali Benaqa", "email": GMAIL_ADDRESS},
+                "to": [{"email": destinataire}],
                 "subject": sujet,
-                "text": corps,
+                "textContent": corps,
             },
             timeout=15,
         )
@@ -65,7 +64,7 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
             print(f"   ✅ Email envoyé à {destinataire}")
             return True
         else:
-            print(f"   ❌ Erreur Resend : {resp.status_code} — {resp.text}")
+            print(f"   ❌ Erreur Brevo : {resp.status_code} — {resp.text}")
             return False
     except Exception as e:
         print(f"   ❌ Erreur envoi email : {e}")
