@@ -2,11 +2,10 @@
 emailer.py — Envoi et lecture d'emails via Gmail SMTP/IMAP
 """
 
-import smtplib
-import ssl
 import imaplib
 import email
 import os
+import requests as req
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
@@ -20,9 +19,8 @@ from memory import Memory
 
 GMAIL_ADDRESS  = os.environ.get("GMAIL_ADDRESS",  "mohamedalibenaqa@gmail.com")
 GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "nqus gjnt aohl kkue")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 465   # SSL direct (plus fiable que 587/STARTTLS)
 IMAP_HOST = "imap.gmail.com"
 
 
@@ -32,35 +30,43 @@ IMAP_HOST = "imap.gmail.com"
 
 def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = None) -> bool:
     """
-    Envoie un email depuis le compte Gmail d'Ali.
+    Envoie un email via Resend API (HTTP — fonctionne sur Railway).
     Retourne True si succès.
     """
+    if not RESEND_API_KEY:
+        print("   ❌ RESEND_API_KEY manquante")
+        return False
     try:
-        msg = MIMEMultipart("alternative")
-        msg["From"]    = GMAIL_ADDRESS
-        msg["To"]      = destinataire
-        msg["Subject"] = sujet
-
-        msg.attach(MIMEText(corps, "plain", "utf-8"))
-
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_ADDRESS, destinataire, msg.as_string())
-
-        # Log en mémoire
-        mem = Memory()
-        mem.log_email({
-            "destinataire": destinataire,
-            "objet": sujet,
-            "corps": corps,
-            "type_email": "candidature",
-            "ref_id": offre_id,
-            "ref_type": "offre",
-        })
-        print(f"   ✅ Email envoyé à {destinataire}")
-        return True
-
+        resp = req.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"Ali Benaqa <onboarding@resend.dev>",
+                "to": [destinataire],
+                "reply_to": GMAIL_ADDRESS,
+                "subject": sujet,
+                "text": corps,
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            mem = Memory()
+            mem.log_email({
+                "destinataire": destinataire,
+                "objet": sujet,
+                "corps": corps,
+                "type_email": "candidature",
+                "ref_id": offre_id,
+                "ref_type": "offre",
+            })
+            print(f"   ✅ Email envoyé à {destinataire}")
+            return True
+        else:
+            print(f"   ❌ Erreur Resend : {resp.status_code} — {resp.text}")
+            return False
     except Exception as e:
         print(f"   ❌ Erreur envoi email : {e}")
         return False
