@@ -31,7 +31,8 @@ from scraper_hellowork import scraper_hellowork
 from scraper_labonnealternance import scraper_labonnealternance
 from scraper_france_travail import scraper_france_travail
 from scorer import scorer_offres_nouvelles
-from notifier import notifier_offres
+from notifier import notifier_offres, alerter_offres_top
+from reponses import run_suivi_candidatures
 from emailer import envoyer_email
 from candidater import run_candidatures_auto, envoyer_resume_quotidien
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
@@ -233,11 +234,24 @@ def run_cycle():
         log.error(f"Scoring : {e}")
         stats = {"interessantes": 0, "ignorees": 0, "erreurs": 0}
 
+    # Alerte immédiate pour les offres >90%
+    try:
+        alerter_offres_top()
+    except Exception as e:
+        log.error(f"Alerte top offres : {e}")
+
     try:
         nb_notifs = notifier_offres()
     except Exception as e:
         log.error(f"Notifs : {e}")
         nb_notifs = 0
+
+    # Lecture réponses recruteurs + relances auto
+    try:
+        suivi = run_suivi_candidatures()
+    except Exception as e:
+        log.error(f"Suivi candidatures : {e}")
+        suivi = {"reponses": 0, "relances": 0}
 
     try:
         cand_stats = run_candidatures_auto()
@@ -263,8 +277,8 @@ def run_cycle():
     resume = (
         f"✅ <b>Cycle terminé</b>\n"
         f"📡 Nouvelles : {nb_nouvelles} | ✅ Intéressantes : {stats['interessantes']}\n"
-        f"📤 Candidatures envoyées : {nb_cands} | 📲 Notifs : {nb_notifs}\n"
-        f"🎓 Alumni contactés : {nb_alumni}"
+        f"📤 Candidatures : {nb_cands} | 🔄 Relances : {suivi['relances']}\n"
+        f"📬 Réponses reçues : {suivi['reponses']} | 🎓 Alumni : {nb_alumni}"
     )
     _telegram_send(resume)
     log.info(f"Cycle terminé — {nb_nouvelles} nouvelles, {stats['interessantes']} intéressantes")

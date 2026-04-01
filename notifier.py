@@ -108,6 +108,46 @@ def notifier_offres() -> int:
 
 
 # ────────────────────────────────────────────────
+# ALERTE IMMÉDIATE OFFRES TOP (>90%)
+# ────────────────────────────────────────────────
+
+def alerter_offres_top() -> int:
+    """
+    Envoie une alerte immédiate pour les offres scorées >90% pas encore notifiées.
+    Appelé juste après le scoring, avant le cycle complet.
+    """
+    mem = Memory()
+    with mem._connect() as conn:
+        offres = conn.execute("""
+            SELECT * FROM offres
+            WHERE score_pertinence >= 0.90
+              AND notif_envoyee = 0
+              AND statut = 'intéressant'
+            ORDER BY score_pertinence DESC
+        """).fetchall()
+
+    if not offres:
+        return 0
+
+    envoyer_message(
+        f"🔥 <b>{len(offres)} offre(s) TOP à +90% trouvée(s) !</b>"
+    )
+
+    nb = 0
+    for offre in offres:
+        offre = dict(offre)
+        message = (
+            f"🔥🔥 <b>OFFRE TOP — {int(offre['score_pertinence'] * 100)}%</b>\n\n"
+            + formater_offre(offre)
+        )
+        if envoyer_message(message):
+            mem.marquer_notif_envoyee(offre["id"])
+            nb += 1
+
+    return nb
+
+
+# ────────────────────────────────────────────────
 # LANCEMENT
 # ────────────────────────────────────────────────
 
