@@ -40,6 +40,7 @@ from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidat
 from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
 from memory import Memory
+from dashboard import start_dashboard
 
 # ────────────────────────────────────────────────
 # CONFIG
@@ -708,6 +709,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ────────────────────────────────────────────────
 
 def main():
+    # Lance le dashboard web
+    start_dashboard()
+    log.info(f"🌐 Dashboard lancé sur le port {os.environ.get('PORT', 8080)}")
+
     # Charge l'historique persistant
     conversation_history.extend(Memory().load_history())
 
