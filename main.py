@@ -30,6 +30,7 @@ from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from emailer import envoyer_email
 from candidater import run_candidatures_auto, envoyer_resume_quotidien
+from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
 from memory import Memory
 
 # ────────────────────────────────────────────────
@@ -189,6 +190,12 @@ def run_cycle():
     log.info("🚀 Démarrage du cycle agent")
     _telegram_send("🤖 <b>Cycle agent démarré</b>")
 
+    # Restaure les candidatures précédentes depuis Turso pour éviter doublons
+    try:
+        restaurer_statuts_depuis_turso()
+    except Exception as e:
+        log.error(f"Turso restauration : {e}")
+
     nb_nouvelles = 0
     try:
         nb_nouvelles += scraper_wttj()
@@ -217,6 +224,12 @@ def run_cycle():
     except Exception as e:
         log.error(f"Candidatures : {e}")
         nb_cands = 0
+
+    # Synchronise les candidatures vers Turso pour persister entre déploiements
+    try:
+        sync_candidatures_vers_turso()
+    except Exception as e:
+        log.error(f"Turso sync : {e}")
 
     resume = (
         f"✅ <b>Cycle terminé</b>\n"
