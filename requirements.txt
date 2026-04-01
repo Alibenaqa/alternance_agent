@@ -1,0 +1,4 @@
+anthropic==0.87.0
+python-telegram-bot==22.7
+requests==2.33.1
+pypdf==6.9.2
