@@ -37,6 +37,7 @@ from emailer import envoyer_email
 from candidater import run_candidatures_auto, envoyer_resume_quotidien
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
 from alumni_linkedin import run_alumni_outreach
+from linkedin_easy_apply import run_linkedin_easy_apply
 from memory import Memory
 
 # ────────────────────────────────────────────────
@@ -259,6 +260,12 @@ def run_cycle():
     except Exception as e:
         log.error(f"Candidatures : {e}")
         nb_cands = 0
+
+    try:
+        ea_stats = run_linkedin_easy_apply()
+        nb_cands += ea_stats["candidatures"]
+    except Exception as e:
+        log.error(f"LinkedIn Easy Apply : {e}")
 
     # Synchronise les candidatures vers Turso pour persister entre déploiements
     try:
