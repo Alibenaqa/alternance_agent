@@ -50,7 +50,7 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GMAIL_ADDRESS     = os.environ.get("GMAIL_ADDRESS", "mohamedalibenaqa@gmail.com")
 PROFIL_PATH       = Path(__file__).parent / "profil_ali.json"
 
-INTERVALLE_HEURES = 12
+INTERVALLE_HEURES = 8
 
 conversation_history: list[dict] = []
 
