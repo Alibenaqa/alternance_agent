@@ -28,6 +28,8 @@ from scraper_wttj import scraper_wttj
 from scraper_linkedin import scraper_linkedin
 from scraper_indeed import scraper_indeed
 from scraper_hellowork import scraper_hellowork
+from scraper_labonnealternance import scraper_labonnealternance
+from scraper_france_travail import scraper_france_travail
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from emailer import envoyer_email
@@ -216,6 +218,14 @@ def run_cycle():
         nb_nouvelles += scraper_hellowork()
     except Exception as e:
         log.error(f"Scraping HelloWork : {e}")
+    try:
+        nb_nouvelles += scraper_labonnealternance()
+    except Exception as e:
+        log.error(f"Scraping LaBonneAlternance : {e}")
+    try:
+        nb_nouvelles += scraper_france_travail()
+    except Exception as e:
+        log.error(f"Scraping France Travail : {e}")
 
     try:
         stats = scorer_offres_nouvelles()
