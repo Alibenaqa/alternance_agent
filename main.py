@@ -28,6 +28,7 @@ from scraper_wttj import scraper_wttj
 from scraper_linkedin import scraper_linkedin
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
+from emailer import envoyer_email
 from memory import Memory
 
 # ────────────────────────────────────────────────
@@ -43,6 +44,7 @@ log = logging.getLogger(__name__)
 TELEGRAM_TOKEN    = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID  = int(os.environ["TELEGRAM_CHAT_ID"])
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+GMAIL_ADDRESS     = os.environ.get("GMAIL_ADDRESS", "mohamedalibenaqa@gmail.com")
 PROFIL_PATH       = Path(__file__).parent / "profil_ali.json"
 
 INTERVALLE_HEURES = 12
@@ -360,10 +362,60 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Rédige un email de candidature pour :\n"
                 f"Poste : {o['titre']}\nEntreprise : {o['entreprise']}\n"
                 f"Description : {o['description'][:500] if o['description'] else 'N/A'}\n"
-                f"Style : pro mais accessible, 150-200 mots, met en avant mes 3 expériences data et Hetic."
+                f"Style : pro mais accessible, 150-200 mots, met en avant mes 3 expériences data et Hetic.\n"
+                f"Termine par une ligne séparée : OBJET: [sujet de l'email]"
             )
-            email = demander_claude(prompt)
-            await query.message.reply_text(f"📧 <b>Email :</b>\n\n{email}", parse_mode="HTML")
+            brouillon = demander_claude(prompt)
+            # Extraire l'objet si présent
+            objet = f"Candidature alternance – {o['titre']} – Ali Benaqa"
+            if "OBJET:" in brouillon:
+                lignes = brouillon.split("\n")
+                for l in lignes:
+                    if l.startswith("OBJET:"):
+                        objet = l.replace("OBJET:", "").strip()
+                brouillon = "\n".join(l for l in lignes if not l.startswith("OBJET:")).strip()
+
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("📤 Envoyer maintenant", callback_data=f"send_{offre_id}|{objet[:60]}"),
+                InlineKeyboardButton("❌ Annuler", callback_data="cancel"),
+            ]])
+            # Stocke le brouillon temporairement en mémoire
+            mem.remember(f"brouillon_{offre_id}", brouillon)
+            await query.message.reply_text(
+                f"📧 <b>Brouillon :</b>\n\n{brouillon}\n\n<b>Objet :</b> {objet}",
+                parse_mode="HTML", reply_markup=kb
+            )
+
+    elif data.startswith("send_"):
+        parts = data[5:].split("|", 1)
+        offre_id = int(parts[0])
+        objet = parts[1] if len(parts) > 1 else "Candidature alternance"
+        brouillon = mem.recall(f"brouillon_{offre_id}") or ""
+        if brouillon:
+            ok = envoyer_email(
+                destinataire=GMAIL_ADDRESS,  # Envoi à soi-même pour test, à changer avec l'email du recruteur
+                sujet=objet,
+                corps=brouillon,
+                offre_id=offre_id,
+            )
+            if ok:
+                mem.add_candidature({
+                    "offre_id": offre_id,
+                    "canal": "email",
+                    "email_dest": GMAIL_ADDRESS,
+                    "objet_email": objet,
+                    "corps_email": brouillon,
+                })
+                await query.edit_message_reply_markup(reply_markup=None)
+                await query.message.reply_text("✅ Email envoyé et candidature enregistrée !")
+            else:
+                await query.message.reply_text("❌ Erreur lors de l'envoi. Vérifie les logs Railway.")
+        else:
+            await query.message.reply_text("⚠️ Brouillon introuvable, refais /offres.")
+
+    elif data == "cancel":
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("❌ Annulé.")
 
 
 # ────────────────────────────────────────────────
