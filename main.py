@@ -25,6 +25,7 @@ from telegram.ext import (
 )
 
 from scraper_wttj import scraper_wttj
+from scraper_linkedin import scraper_linkedin
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from memory import Memory
@@ -185,11 +186,15 @@ def run_cycle():
     log.info("🚀 Démarrage du cycle agent")
     _telegram_send("🤖 <b>Cycle agent démarré</b>")
 
+    nb_nouvelles = 0
     try:
-        nb_nouvelles = scraper_wttj()
+        nb_nouvelles += scraper_wttj()
     except Exception as e:
-        log.error(f"Scraping : {e}")
-        nb_nouvelles = 0
+        log.error(f"Scraping WTTJ : {e}")
+    try:
+        nb_nouvelles += scraper_linkedin()
+    except Exception as e:
+        log.error(f"Scraping LinkedIn : {e}")
 
     try:
         stats = scorer_offres_nouvelles()

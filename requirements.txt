@@ -2,3 +2,4 @@ anthropic==0.87.0
 python-telegram-bot[job-queue]==22.7
 requests==2.33.1
 pypdf==6.9.2
+beautifulsoup4==4.13.4

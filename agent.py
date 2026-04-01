@@ -13,6 +13,7 @@ import time
 from datetime import datetime
 
 from scraper_wttj import scraper_wttj
+from scraper_linkedin import scraper_linkedin
 from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres
 from memory import Memory
@@ -60,13 +61,19 @@ def run_cycle():
     envoyer_telegram("🤖 <b>Agent démarré</b> — cycle en cours...")
 
     # ── ÉTAPE 1 : SCRAPING ──────────────────────
-    log("📡 Étape 1/3 — Scraping WTTJ...")
+    log("📡 Étape 1/3 — Scraping WTTJ + LinkedIn...")
+    nb_nouvelles = 0
     try:
-        nb_nouvelles = scraper_wttj()
-        log(f"✅ Scraping terminé — {nb_nouvelles} nouvelles offres")
+        nb_nouvelles += scraper_wttj()
+        log(f"✅ WTTJ terminé")
     except Exception as e:
-        log(f"❌ Erreur scraping : {e}")
-        nb_nouvelles = 0
+        log(f"❌ Erreur scraping WTTJ : {e}")
+    try:
+        nb_nouvelles += scraper_linkedin()
+        log(f"✅ LinkedIn terminé")
+    except Exception as e:
+        log(f"❌ Erreur scraping LinkedIn : {e}")
+    log(f"📡 Total nouvelles offres : {nb_nouvelles}")
 
     # ── ÉTAPE 2 : SCORING ───────────────────────
     log("🤖 Étape 2/3 — Scoring Claude...")
