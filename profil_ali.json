@@ -1,0 +1,205 @@
+{
+  "identite": {
+    "prenom": "Ali",
+    "nom": "Benaqa",
+    "nom_complet": "Mohamed Ali Benaqa",
+    "email": "alibenaqa123@gmail.com",
+    "telephone": "+33 6 67 67 79 37",
+    "adresse": "Paris, 75011",
+    "linkedin_url": "",
+    "github_url": "",
+    "portfolio_url": "",
+    "permis": "B"
+  },
+
+  "formation": {
+    "ecole": "École Hetic",
+    "lieu": "Montreuil, France",
+    "diplome": "Bachelor Data & Intelligence Artificielle",
+    "programme": "Programme Grande École de la Tech",
+    "annee_actuelle": 3,
+    "date_debut_alternance": "Octobre 2026",
+    "duree_contrat": "12 à 36 mois",
+    "rythme_souhaite": "3 jours entreprise / 2 jours école",
+    "formations_precedentes": [
+      {
+        "etablissement": "Université Ibn Tofail",
+        "pays": "Maroc",
+        "diplome": "L2 Sciences Mathématiques et Informatiques",
+        "periode": "Septembre 2022 - Juillet 2024"
+      },
+      {
+        "etablissement": "Lycée Bennis et Terrab",
+        "pays": "Maroc",
+        "diplome": "Baccalauréat Sciences Physiques et Chimie",
+        "periode": "Septembre 2021 - Juillet 2022"
+      }
+    ]
+  },
+
+  "experiences": [
+    {
+      "titre": "Data Analyst (Freelance)",
+      "entreprise": "Techwin Services",
+      "periode": "Mars 2025 - Juin 2025",
+      "type": "freelance",
+      "missions": [
+        "Mise en place de processus ETL (CSV, bases SQL, API)",
+        "Collecte, homogénéisation et transformation des données",
+        "Nettoyage et standardisation des données (doublons, valeurs manquantes)",
+        "Création de pipelines automatisés de mise à jour des datasets",
+        "Fourniture de rapports exploitables aux équipes IT et métiers"
+      ],
+      "technologies": ["Python", "SQL", "ETL", "API REST"]
+    },
+    {
+      "titre": "Reporting Analyst (Stage)",
+      "entreprise": "Mamda Assurance",
+      "pays": "Maroc",
+      "periode": "Avril 2024 - Août 2024",
+      "type": "stage",
+      "missions": [
+        "Développement et maintenance d'applications web internes (PHP, JavaScript, MySQL)",
+        "Conception et optimisation d'interfaces utilisateurs responsives",
+        "Implémentation de fonctionnalités orientées data (reporting automatisé, extraction)",
+        "Tests, correction de bugs et optimisation des performances"
+      ],
+      "technologies": ["PHP", "JavaScript", "MySQL", "HTML", "CSS"]
+    },
+    {
+      "titre": "Data Analyst",
+      "entreprise": "BNC Corporation",
+      "pays": "Maroc",
+      "periode": "Septembre 2023 - Avril 2024",
+      "type": "emploi",
+      "missions": [
+        "Collecte et nettoyage des données issues des ventes (CRM, ERP, Excel)",
+        "Suivi et analyse des KPI commerciaux (taux de conversion, CA, panier moyen, churn)",
+        "Production de rapports et tableaux de bord Power BI (hebdomadaires/mensuels)",
+        "Analyses statistiques via EViews et Excel pour prévision des ventes"
+      ],
+      "technologies": ["Power BI", "Excel", "EViews", "SQL", "CRM"]
+    }
+  ],
+
+  "projets_academiques": [
+    {
+      "nom": "Site Espace des Arts (salle de cinéma)",
+      "description": "Design et développement complet du site",
+      "technologies": ["HTML", "CSS", "JavaScript"]
+    },
+    {
+      "nom": "Page live Betclic",
+      "description": "Conception UI/UX, stratégie marketing, communication et digitalisation",
+      "technologies": ["UI/UX", "Marketing digital"]
+    },
+    {
+      "nom": "Bot Discord IA",
+      "description": "Bot interactif en Node.js avec intégration d'outils IA et commandes dynamiques",
+      "technologies": ["Node.js", "JavaScript", "IA API"]
+    },
+    {
+      "nom": "Site météo WordPress/PHP",
+      "description": "Création d'une clé API météo et mise en place d'un site dynamique",
+      "technologies": ["WordPress", "PHP", "API REST"]
+    },
+    {
+      "nom": "Application de vote",
+      "description": "Système de vote avec gestion et analyse des données utilisateurs",
+      "technologies": ["Python", "SQL"]
+    },
+    {
+      "nom": "Agent IA de recherche d'alternance",
+      "description": "Bot Python autonome qui scrape les offres, contacte les alumni et postule automatiquement",
+      "technologies": ["Python", "Playwright", "Claude API", "SQLite", "Telegram Bot"]
+    }
+  ],
+
+  "competences_techniques": {
+    "langages": ["Python", "JavaScript", "PHP", "HTML", "CSS", "Node.js", "SQL"],
+    "frameworks": ["React", "Express.js", "Next.js"],
+    "ml_ia": ["ChatGPT API", "Intégration API REST", "Make/Zapier", "Pipelines de données"],
+    "data_analytics": ["Power BI", "EViews", "Excel avancé", "ETL", "KPI", "Tableaux de bord"],
+    "databases": ["MySQL", "PostgreSQL", "MongoDB"],
+    "devops_outils": ["Git", "GitHub", "GitHub Actions", "Docker", "Postman", "Jira", "Webflow"],
+    "crm_saas": ["HubSpot", "Make", "API REST"],
+    "niveaux": {
+      "Python": "intermédiaire-avancé",
+      "JavaScript": "intermédiaire-avancé",
+      "SQL": "intermédiaire",
+      "Power BI": "intermédiaire",
+      "ETL / Data pipelines": "intermédiaire",
+      "IA / LLM API": "intermédiaire",
+      "React": "débutant-intermédiaire",
+      "Docker": "débutant"
+    }
+  },
+
+  "soft_skills": [
+    "Esprit d'initiative",
+    "Polyvalent",
+    "Rigoureux",
+    "Proactif",
+    "Autonome",
+    "Souriant",
+    "Résilient"
+  ],
+
+  "langues": {
+    "français": "bilingue",
+    "anglais": "courant (B1/B2)",
+    "espagnol": "débutant (A1/A2)",
+    "arabe": "langue maternelle"
+  },
+
+  "loisirs": ["Basketball", "Voyages (objectif : tour du monde avant 30 ans)", "Échecs"],
+
+  "recherche_alternance": {
+    "poste_cible": [
+      "Data Analyst",
+      "Data Scientist",
+      "ML Engineer",
+      "AI Engineer",
+      "Data Engineer",
+      "Business Intelligence Analyst"
+    ],
+    "secteurs_preferes": [
+      "Tech / Startup",
+      "FinTech",
+      "HealthTech",
+      "E-commerce",
+      "Consulting Data"
+    ],
+    "secteurs_exclus": [],
+    "taille_entreprise": ["startup", "scale-up", "PME", "grande entreprise"],
+    "localisation": ["Paris", "Île-de-France", "Remote partiel"],
+    "teletravail_souhaite": "hybride (2-3 jours)",
+    "salaire_minimum_mensuel": 900,
+    "disponibilite": "Octobre 2026",
+    "duree_contrat": "12 à 36 mois",
+    "mobilite_geographique": false,
+    "permis_b": true
+  },
+
+  "style_communication": {
+    "ton_emails": "professionnel mais accessible, pas trop formel",
+    "longueur_email": "court et percutant (150-250 mots)",
+    "points_forts_a_mettre_en_avant": [
+      "3 expériences pro en data : BNC Corporation, Mamda Assurance, Techwin Services",
+      "Double compétence data analytics + développement web full-stack",
+      "Expérience concrète ETL, Power BI, KPI commerciaux",
+      "Intégration d'IA et automatisation (ChatGPT API, Make, bots Discord)",
+      "Formation spécialisée Data & IA à Hetic (Grande École de la Tech)",
+      "Proactif : construction d'un agent IA autonome de recherche d'alternance"
+    ],
+    "accroche_personnelle": "Étudiant en 3e année de Bachelor Data & IA à Hetic, j'ai déjà 3 expériences en data analytics (ETL, Power BI, KPI) et je construis des outils IA en Python. Je cherche une alternance de 12 à 36 mois à partir d'octobre 2026 pour continuer à progresser sur des projets data concrets.",
+    "template_email_alumni": "Bonjour {prenom},\n\nJe suis Ali Benaqa, étudiant en 3e année de Bachelor Data & IA à Hetic. En voyant votre parcours chez {entreprise}, j'aurais voulu vous poser quelques questions sur votre expérience et le marché de l'alternance data.\n\nJe suis actuellement à la recherche d'une alternance à partir d'octobre 2026 et votre retour d'expérience m'aiderait vraiment.\n\nSeriez-vous disponible pour un échange rapide de 15 minutes ?\n\nCordialement,\nAli Benaqa\nHetic — Bachelor Data & IA\n+33 6 67 67 79 37"
+  },
+
+  "meta": {
+    "version": "2.0",
+    "source": "CV Cv_ALI_BENAQA_DATA.pdf",
+    "derniere_mise_a_jour": "2026-04-01",
+    "agent_version": "1.0.0"
+  }
+}
