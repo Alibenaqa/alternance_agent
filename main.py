@@ -31,6 +31,7 @@ from notifier import notifier_offres
 from emailer import envoyer_email
 from candidater import run_candidatures_auto, envoyer_resume_quotidien
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
+from alumni_linkedin import run_alumni_outreach
 from memory import Memory
 
 # ────────────────────────────────────────────────
@@ -231,10 +232,19 @@ def run_cycle():
     except Exception as e:
         log.error(f"Turso sync : {e}")
 
+    # Outreach alumni Hetic (1 fois sur 2 pour ne pas surcharger le cycle)
+    nb_alumni = 0
+    try:
+        alumni_stats = run_alumni_outreach()
+        nb_alumni = alumni_stats.get("emails_envoyes", 0)
+    except Exception as e:
+        log.error(f"Alumni outreach : {e}")
+
     resume = (
         f"✅ <b>Cycle terminé</b>\n"
         f"📡 Nouvelles : {nb_nouvelles} | ✅ Intéressantes : {stats['interessantes']}\n"
-        f"📤 Candidatures envoyées : {nb_cands} | 📲 Notifs : {nb_notifs}"
+        f"📤 Candidatures envoyées : {nb_cands} | 📲 Notifs : {nb_notifs}\n"
+        f"🎓 Alumni contactés : {nb_alumni}"
     )
     _telegram_send(resume)
     log.info(f"Cycle terminé — {nb_nouvelles} nouvelles, {stats['interessantes']} intéressantes")
