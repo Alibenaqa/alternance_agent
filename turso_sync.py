@@ -56,6 +56,32 @@ def init_turso():
                 date_envoi TEXT DEFAULT (datetime('now'))
             )
         """)
+        _turso("""
+            CREATE TABLE IF NOT EXISTS candidatures_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT,
+                entreprise TEXT,
+                titre TEXT,
+                canal TEXT,
+                email_dest TEXT,
+                objet_email TEXT,
+                date_candidature TEXT,
+                statut TEXT DEFAULT 'envoyée',
+                nb_relances INTEGER DEFAULT 0
+            )
+        """)
+        _turso("""
+            CREATE TABLE IF NOT EXISTS alumni_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prenom TEXT,
+                nom TEXT,
+                entreprise TEXT,
+                poste_actuel TEXT,
+                email TEXT,
+                statut_contact TEXT,
+                date_contact TEXT
+            )
+        """)
         print("✅ Turso initialisé")
     except Exception as e:
         print(f"⚠️  Turso init : {e}")
@@ -99,7 +125,7 @@ def get_urls_postulees() -> set:
 
 def sync_candidatures_vers_turso():
     """
-    Synchronise les candidatures locales vers Turso.
+    Synchronise les candidatures locales vers Turso (offres + détails candidatures + alumni).
     Appelé après chaque cycle pour garder Turso à jour.
     """
     try:
@@ -107,14 +133,61 @@ def sync_candidatures_vers_turso():
         with mem._connect() as conn:
             postulees = conn.execute("""
                 SELECT o.url, o.entreprise, o.titre
-                FROM offres o
-                WHERE o.statut = 'postulé'
+                FROM offres o WHERE o.statut = 'postulé'
             """).fetchall()
 
+            candidatures = conn.execute("""
+                SELECT c.canal, c.email_dest, c.objet_email, c.date_candidature,
+                       c.statut, c.nb_relances, o.url, o.entreprise, o.titre
+                FROM candidatures c
+                LEFT JOIN offres o ON c.offre_id = o.id
+                ORDER BY c.date_candidature DESC
+            """).fetchall()
+
+            alumni = conn.execute("""
+                SELECT prenom, nom, entreprise, poste_actuel, email,
+                       statut_contact, date_contact
+                FROM alumni WHERE contacte = 1
+            """).fetchall()
+
+        # Sync offres postulées
         for o in postulees:
             marquer_postule_turso(o["url"], o["entreprise"], o["titre"])
 
-        print(f"✅ Turso sync : {len(postulees)} candidatures synchronisées")
+        # Sync candidatures complètes (INSERT OR IGNORE sur url+date)
+        for c in candidatures:
+            try:
+                _turso("""
+                    INSERT OR IGNORE INTO candidatures_log
+                        (url, entreprise, titre, canal, email_dest, objet_email,
+                         date_candidature, statut, nb_relances)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, [
+                    c["url"] or "", c["entreprise"] or "", c["titre"] or "",
+                    c["canal"] or "", c["email_dest"] or "", c["objet_email"] or "",
+                    c["date_candidature"] or "", c["statut"] or "envoyée",
+                    c["nb_relances"] or 0,
+                ])
+            except Exception:
+                pass
+
+        # Sync alumni contactés
+        for a in alumni:
+            try:
+                _turso("""
+                    INSERT OR IGNORE INTO alumni_log
+                        (prenom, nom, entreprise, poste_actuel, email,
+                         statut_contact, date_contact)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, [
+                    a["prenom"] or "", a["nom"] or "", a["entreprise"] or "",
+                    a["poste_actuel"] or "", a["email"] or "",
+                    a["statut_contact"] or "", a["date_contact"] or "",
+                ])
+            except Exception:
+                pass
+
+        print(f"✅ Turso sync : {len(postulees)} offres, {len(candidatures)} candidatures, {len(alumni)} alumni")
     except Exception as e:
         print(f"⚠️  Turso sync : {e}")
 

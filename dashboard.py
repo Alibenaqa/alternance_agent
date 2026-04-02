@@ -21,14 +21,40 @@ PORT = int(os.environ.get("PORT", 8080))
 # API ENDPOINTS
 # ────────────────────────────────────────────────
 
+def _turso_stats():
+    """Récupère les stats depuis Turso quand la DB locale est vide."""
+    try:
+        from turso_sync import _turso
+        r1 = _turso("SELECT COUNT(*) as nb FROM candidatures_log")
+        total_cands = r1["results"][0]["response"]["result"]["rows"][0][0]["value"]
+
+        r2 = _turso("SELECT COUNT(*) as nb FROM alumni_log")
+        total_alumni = r2["results"][0]["response"]["result"]["rows"][0][0]["value"]
+
+        r3 = _turso("SELECT canal, entreprise, titre, date_candidature FROM candidatures_log ORDER BY date_candidature DESC LIMIT 1")
+        rows = r3["results"][0]["response"]["result"]["rows"]
+        derniere = {
+            "canal": rows[0][0]["value"], "entreprise": rows[0][1]["value"],
+            "titre": rows[0][2]["value"], "date_candidature": rows[0][3]["value"],
+        } if rows else None
+
+        return {
+            "total_candidatures": int(total_cands or 0),
+            "alumni_contactes": int(total_alumni or 0),
+            "from_turso": True,
+        }, derniere
+    except Exception:
+        return {}, None
+
+
 @app.route("/api/stats")
 def api_stats():
     mem = Memory()
     stats = mem.get_stats()
     with mem._connect() as conn:
-        sources = conn.execute("""
-            SELECT source, COUNT(*) as nb FROM offres GROUP BY source
-        """).fetchall()
+        sources = conn.execute(
+            "SELECT source, COUNT(*) as nb FROM offres GROUP BY source"
+        ).fetchall()
         cands_semaine = conn.execute("""
             SELECT COUNT(*) FROM candidatures
             WHERE date_candidature >= datetime('now', '-7 days')
@@ -38,6 +64,13 @@ def api_stats():
             FROM candidatures c LEFT JOIN offres o ON c.offre_id = o.id
             ORDER BY c.date_candidature DESC LIMIT 1
         """).fetchone()
+
+    # Si DB locale vide (redéploiement Railway), fallback sur Turso
+    if stats["total_candidatures"] == 0:
+        turso_stats, turso_derniere = _turso_stats()
+        stats.update(turso_stats)
+        if turso_derniere and not derniere_cand:
+            derniere_cand = turso_derniere
 
     return jsonify({
         **stats,
@@ -61,7 +94,20 @@ def api_candidatures():
             ORDER BY c.date_candidature DESC
             LIMIT 50
         """).fetchall()
-    return jsonify([dict(r) for r in rows])
+    local = [dict(r) for r in rows]
+
+    # Fallback Turso si DB locale vide
+    if not local:
+        try:
+            from turso_sync import _turso
+            r = _turso("SELECT url, entreprise, titre, canal, email_dest, objet_email, date_candidature, statut, nb_relances FROM candidatures_log ORDER BY date_candidature DESC LIMIT 50")
+            cols = [c["name"] for c in r["results"][0]["response"]["result"]["cols"]]
+            turso_rows = r["results"][0]["response"]["result"]["rows"]
+            local = [{cols[i]: row[i]["value"] for i in range(len(cols))} for row in turso_rows]
+        except Exception:
+            pass
+
+    return jsonify(local)
 
 
 @app.route("/api/offres")
