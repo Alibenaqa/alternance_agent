@@ -74,10 +74,12 @@ Poste : {offre.get('titre', '')}
 Entreprise : {offre.get('entreprise', '')}
 
 PROFIL ALI :
-- Étudiant Bachelor Data & IA, Hetic, 2e année actuellement (3e année dès septembre 2026)
-- 3 exp pro : Data Analyst Techwin (ETL Python), Stage Mamda (Power BI, PHP), BNC Corp (KPI)
-- Compétences : Python, SQL, Power BI, ETL, LLM API, automatisation
-- Disponibilité : Octobre 2026
+- 2e année Bachelor Data & IA, Hetic Montreuil (3e année dès sept. 2026)
+- Expériences : Data Analyst freelance Techwin Services (ETL Python, pipelines), Reporting Analyst stage Mamda Assurance Maroc (Power BI, PHP/MySQL), Data Analyst BNC Corporation Maroc (KPI, EViews, tableaux de bord)
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Make, Claude API
+- Projet : agent IA autonome de recherche d'alternance (Python, Railway, Telegram)
+- Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
+- Disponibilité : Octobre 2026 | Paris (75011)
 
 Question du formulaire : "{question}"
 

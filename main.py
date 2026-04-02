@@ -99,8 +99,9 @@ Disponibilité : {r['disponibilite']} | Durée : {r['duree_contrat']}
 Postes ciblés : {', '.join(r['poste_cible'])}
 Secteurs préférés : {', '.join(r['secteurs_preferes'])}
 Localisation : {', '.join(r['localisation'])}
-Expériences : Data Analyst (Techwin, BNC Corporation), Stage Mamda Assurance
-Stack : Python, SQL, Power BI, ETL, API REST, Machine Learning
+Expériences : Data Analyst freelance Techwin Services (ETL Python), Reporting Analyst stage Mamda Assurance (Power BI/PHP), Data Analyst BNC Corporation (KPI/EViews)
+Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Make, ChatGPT API, Claude API
+Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
 
 === STATS ===
 Offres : {stats['total_offres']} total | {stats['offres_par_statut'].get('intéressant', 0)} intéressantes

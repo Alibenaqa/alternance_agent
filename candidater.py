@@ -53,11 +53,15 @@ POSTE : {offre['titre']} chez {offre['entreprise']} ({offre['localisation']})
 DESCRIPTION : {(offre.get('description') or 'Non précisée')[:600]}
 
 TON PROFIL :
-- Bac+2 actuellement, Bac+3 dès octobre 2026. Rythme : 3j entreprise / 2j école.
-- Expériences data : Data Analyst chez Techwin Services (ETL Python, pipelines), stage Mamda Assurance Maroc (Power BI, reporting automatisé), Data Analyst BNC Corporation (KPI, tableaux de bord).
-- Projet perso marquant : agent IA autonome en Python qui scrape des offres d'alternance, les score, postule automatiquement et envoie les candidatures par email — déployé sur Railway, piloté via Telegram.
-- Stack selon le poste : Python/SQL/ETL/Power BI (data), Claude API/LLM/automatisation (IA), React/Node.js/JS (dev web).
-- GitHub : https://github.com/Alibenaqa
+- 2e année Bachelor Data & IA, Hetic Montreuil (3e année dès sept. 2026). Rythme alternance : 3j entreprise / 2j école.
+- Expériences :
+  • Data Analyst freelance — Techwin Services (mars-juin 2025) : pipelines ETL Python, traitement données hétérogènes (CSV, SQL, API), pipelines automatisés
+  • Reporting Analyst (stage) — Mamda Assurance Maroc (avr-août 2024) : apps web PHP/MySQL, reporting automatisé Power BI, optimisation interfaces data
+  • Data Analyst — BNC Corporation Maroc (sept 2023-avr 2024) : KPI commerciaux, tableaux de bord Power BI hebdo/mensuels, analyses EViews/Excel
+- Projet perso marquant : agent IA autonome en Python qui scrape des offres d'alternance, les score avec Claude API, postule automatiquement et pilote tout via Telegram — déployé sur Railway
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker (bases), Make, ChatGPT API
+- Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
+- GitHub : https://github.com/Alibenaqa | Paris (75011)
 
 RÈGLES D'ÉCRITURE — respecte-les toutes sans exception :
 1. Commence directement par "Bonjour," (pas "Madame, Monsieur", pas d'accroche marketing)

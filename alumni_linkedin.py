@@ -299,12 +299,13 @@ Il contacte un alumni Hetic pour demander de l'aide dans sa recherche d'alternan
 Il sera en 3e année (Bac+3) à partir de septembre 2026.
 
 PROFIL ALI (à mentionner de façon naturelle, pas en liste) :
-- Étudiant Bachelor Data & IA, Hetic — 2e année actuellement (3e année dès sept. 2026)
-- 3 expériences professionnelles en data : Techwin Services (ETL, Python freelance),
-  stage Mamda Assurance (reporting Power BI, PHP/MySQL), BNC Corporation (KPI, tableaux de bord)
-- Compétences : Python, SQL, Power BI, ETL, LLM API (Claude, ChatGPT)
-- Projet phare : agent IA autonome en Python qui scrape des offres et postule tout seul
-- GitHub : https://github.com/Alibenaqa
+- 2e année Bachelor Data & IA, Hetic Montreuil — 3e année dès septembre 2026
+- 3 expériences : Data Analyst freelance Techwin Services (ETL Python, pipelines de données),
+  Reporting Analyst stage Mamda Assurance Maroc (Power BI, PHP/MySQL, reporting automatisé),
+  Data Analyst BNC Corporation Maroc (KPI commerciaux, tableaux de bord EViews/Excel)
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, MongoDB, Git
+- Projet phare : agent IA autonome en Python qui scrape des offres d'alternance, les score avec Claude API et postule automatiquement — déployé sur Railway, piloté via Telegram
+- GitHub : https://github.com/Alibenaqa | Paris (75011)
 
 ALUMNI CONTACTÉ :
 - Prénom : {prenom}

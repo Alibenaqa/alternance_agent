@@ -36,19 +36,18 @@ def charger_profil() -> dict:
 def resumer_profil(profil: dict) -> str:
     """Génère un résumé court du profil pour le prompt Claude."""
     r = profil["recherche_alternance"]
-    f = profil["formation"]
     return f"""
 Candidat : {profil['identite']['prenom']} {profil['identite']['nom']}
-Formation : {f['diplome']} — {f['ecole']}
-Niveau actuel : Bac+2 (2e année Bachelor) | Sera en Bac+3 (3e année) à partir de septembre 2026
-Début alternance : {r['disponibilite']} | Durée : {r['duree_contrat']}
-Rythme : {f['rythme_souhaite']}
+Formation : Bachelor Data & IA — Hetic Montreuil (2e année, 3e année dès sept. 2026)
+Niveau actuel : Bac+2 | Sera en Bac+3 dès septembre 2026
+Début alternance : {r['disponibilite']} | Durée : {r['duree_contrat']} | Rythme : 3j entreprise / 2j école
 Postes ciblés : {', '.join(r['poste_cible'])}
-Secteurs préférés : {', '.join(r['secteurs_preferes'])}
-Mobilité : France entière (toutes villes acceptées), télétravail/hybride = préféré
-Compétences clés : Python, SQL, Power BI, ETL, API REST, Machine Learning, Node.js, React
-Expériences : Data Analyst (Techwin Services, BNC Corporation), Stage Mamda Assurance
-NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 (3e année Bachelor) dès sept. 2026
+Mobilité : France entière, télétravail/hybride préféré
+Compétences : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker (bases), Make, ChatGPT API, Claude API
+Expériences : Data Analyst freelance Techwin Services (ETL Python), Reporting Analyst stage Mamda Assurance (Power BI/PHP), Data Analyst BNC Corporation (KPI/EViews)
+Projet phare : agent IA autonome de recherche d'alternance (Python, Claude API, Playwright, Railway, Telegram)
+Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
+NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 dès sept. 2026
 """.strip()
 
 

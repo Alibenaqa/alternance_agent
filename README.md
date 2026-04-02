@@ -2,7 +2,7 @@
 
 Agent Python entièrement autonome qui scrape les offres d'alternance sur 8 plateformes, les score par IA, postule automatiquement, suit les réponses, relance les recruteurs, contacte des alumni et affiche tout sur un dashboard web — le tout piloté depuis Telegram.
 
-Développé par **Ali Benaqa** — Bachelor Data & IA, Hetic (3e année)
+Développé par **Ali Benaqa** — Bachelor Data & IA, Hetic (2e année — 3e année dès sept. 2026)
 
 ---
 
@@ -154,12 +154,12 @@ Chaque offre nouvellement scrapée reçoit un score 0.0–1.0 via Claude Haiku.
 7. Notification Telegram pour chaque candidature
 
 ### Email de candidature (Claude Haiku)
-- Email 200–250 mots, style pro mais humain
-- Adapté au TYPE de poste (Data Scientist → pipelines ML, Dev Web → React/Node.js, etc.)
-- Mentionne les 3 expériences pro d'Ali avec chiffres concrets
-- Inclut projet agent IA comme preuve de compétences
-- Signature avec GitHub + LinkedIn + téléphone
-- Post-scriptum indiquant que l'email a été envoyé par l'agent IA lui-même
+- 130–160 mots, 3 paragraphes, ton humain et direct (pas de langue de bois)
+- Adapté au TYPE de poste (Data → ETL/Power BI, IA → Claude API/agent, Dev → React/Node.js)
+- Rebondit sur la description de l'offre (techno ou secteur mentionné)
+- Cite des expériences concrètes : Techwin Services (ETL Python), Mamda Assurance (Power BI), BNC Corporation (KPI/EViews)
+- Mots interdits : "je me permets de", "dynamique", "passionné", "opportunité", "n'hésitez pas à"
+- Signature sobre + PS sur l'agent IA, CV joint en PDF
 
 ### Hunter.io
 **Fichier :** `hunter.py`
@@ -490,4 +490,24 @@ alternance_agent/
 
 ---
 
-*Agent développé de A à Z par Ali Benaqa dans le cadre de sa recherche d'alternance — Bachelor Data & IA, Hetic, promotion 2026.*
+---
+
+## Profil candidat
+
+**Ali Benaqa** — [alibenaqa123@gmail.com](mailto:alibenaqa123@gmail.com) | +33 6 67 67 79 37 | Paris (75011)
+
+**Formation :** Bachelor Data & Intelligence Artificielle — Hetic Montreuil
+2e année actuellement · 3e année (Bac+3) dès septembre 2026 · Alternance recherchée à partir d'octobre 2026
+
+**Expériences :**
+- Data Analyst freelance — Techwin Services (mars–juin 2025) : pipelines ETL Python, traitement CSV/SQL/API, automatisation datasets
+- Reporting Analyst (stage) — Mamda Assurance Maroc (avr–août 2024) : apps web PHP/MySQL, reporting automatisé Power BI, optimisation interfaces data
+- Data Analyst — BNC Corporation Maroc (sept 2023–avr 2024) : KPI commerciaux, tableaux de bord Power BI, analyses EViews/Excel
+
+**Compétences :** Python · SQL · Power BI · ETL · JavaScript · Node.js · React · PHP · MySQL · PostgreSQL · MongoDB · Git · Docker (bases) · Make · ChatGPT API · Claude API
+
+**Langues :** Français bilingue · Anglais B2/C1 · Espagnol A1/A2
+
+**Liens :** [GitHub](https://github.com/Alibenaqa) · [LinkedIn](https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/)
+
+*Agent développé de A à Z par Ali Benaqa dans le cadre de sa recherche d'alternance.*
