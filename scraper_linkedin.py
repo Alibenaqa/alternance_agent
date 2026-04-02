@@ -6,10 +6,13 @@ Usage:
     python scraper_linkedin.py
 """
 
+import os
 import time
 import requests
 from bs4 import BeautifulSoup
 from memory import Memory
+
+SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "")
 
 # ────────────────────────────────────────────────
 # CONFIGURATION
@@ -67,22 +70,42 @@ def fetch_description(url: str) -> str:
 
 
 def fetch_page(keyword: str, start: int = 0) -> str | None:
-    """Récupère une page de résultats LinkedIn. Retourne le HTML ou None."""
-    params = {
+    """Récupère une page de résultats LinkedIn via ScraperAPI (si dispo) ou directement."""
+    target_params = {
         "keywords": keyword,
         "location": "France",
         "f_TPR": "r2592000",  # 30 derniers jours
-        "f_JT": "I",           # I = Internship (apprentissage/alternance)
+        "f_JT": "I",          # I = Internship (apprentissage/alternance)
         "start": start,
     }
+
+    # Construit l'URL cible
+    from urllib.parse import urlencode
+    target_url = f"{BASE_URL}?{urlencode(target_params)}"
+
     try:
-        resp = requests.get(BASE_URL, headers=HEADERS, params=params, timeout=15)
+        if SCRAPERAPI_KEY:
+            # Passe par ScraperAPI pour contourner le blocage IP Railway
+            resp = requests.get(
+                "http://api.scraperapi.com",
+                params={
+                    "api_key": SCRAPERAPI_KEY,
+                    "url": target_url,
+                    "country_code": "fr",
+                    "render": "false",
+                },
+                timeout=30,
+            )
+        else:
+            # Requête directe (marche en local, bloquée sur Railway)
+            resp = requests.get(BASE_URL, headers=HEADERS, params=target_params, timeout=15)
+
         if resp.status_code == 200:
-            content_len = len(resp.text)
-            if content_len < 500:
-                print(f"   ⚠️  Réponse trop courte ({content_len} chars) — LinkedIn bloque probablement l'IP Railway")
+            if len(resp.text) < 500:
+                print(f"   ⚠️  Réponse trop courte ({len(resp.text)} chars) — IP bloquée par LinkedIn")
                 return None
             return resp.text
+
         print(f"   ⚠️  Status {resp.status_code} pour '{keyword}' (start={start})")
         return None
     except requests.RequestException as e:
