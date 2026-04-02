@@ -42,11 +42,29 @@ BASE_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/sear
 
 PAUSE = 3  # secondes entre requêtes
 OFFRES_PAR_PAGE = 25
+PAUSE_DESC = 1.5  # pause entre fetch de descriptions
 
 
 # ────────────────────────────────────────────────
 # FONCTIONS
 # ────────────────────────────────────────────────
+
+def fetch_description(url: str) -> str:
+    """Récupère la description d'une offre LinkedIn depuis sa page publique."""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return ""
+        soup = BeautifulSoup(resp.text, "html.parser")
+        desc_el = soup.find("div", class_="description__text") or \
+                  soup.find("div", {"class": lambda c: c and "show-more-less-html" in c}) or \
+                  soup.find("section", class_="description")
+        if desc_el:
+            return desc_el.get_text(separator=" ", strip=True)[:2000]
+        return ""
+    except Exception:
+        return ""
+
 
 def fetch_page(keyword: str, start: int = 0) -> str | None:
     """Récupère une page de résultats LinkedIn. Retourne le HTML ou None."""
@@ -141,6 +159,11 @@ def scraper_linkedin() -> int:
             for offre in offres:
                 if mem.offre_existe(offre["url"]):
                     continue
+                # Fetch description depuis la page publique
+                desc = fetch_description(offre["url"])
+                if desc:
+                    offre["description"] = desc
+                    time.sleep(PAUSE_DESC)
                 oid = mem.add_offre(offre)
                 if oid:
                     nouvelles += 1

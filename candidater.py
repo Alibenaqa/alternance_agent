@@ -327,13 +327,22 @@ def run_candidatures_auto() -> dict:
             candidatures_envoyees.append({"titre": offre["titre"], "entreprise": offre["entreprise"], "canal": "email"})
             continue
 
-        # Tentative 2 : formulaire WTTJ
-        ok = candidater_wttj(offre, mem)
-        if ok:
-            stats["formulaire"] += 1
-            candidatures_envoyees.append({"titre": offre["titre"], "entreprise": offre["entreprise"], "canal": "formulaire"})
-        else:
+        # Tentative 2 : formulaire WTTJ (seulement pour les offres WTTJ)
+        ok = False
+        if "welcometothejungle" in offre.get("url", ""):
+            ok = candidater_wttj(offre, mem)
+            if ok:
+                stats["formulaire"] += 1
+                candidatures_envoyees.append({"titre": offre["titre"], "entreprise": offre["entreprise"], "canal": "formulaire"})
+
+        if not ok:
             stats["echecs"] += 1
+            # Marque 'sans_email' pour ne pas retenter indéfiniment
+            # Les offres LinkedIn seront traitées par Easy Apply séparément
+            source = offre.get("source", "")
+            if source != "linkedin":
+                mem.update_offre_statut(offre["id"], "ignoré", "Aucun email trouvé et pas WTTJ")
+            print(f"   ⏭️  Aucune méthode disponible pour {offre['entreprise']} ({source})")
 
     return {**stats, "detail": candidatures_envoyees}
 
