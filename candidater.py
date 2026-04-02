@@ -58,10 +58,15 @@ TON PROFIL :
   • Data Analyst freelance — Techwin Services (mars-juin 2025) : pipelines ETL Python, traitement données hétérogènes (CSV, SQL, API), pipelines automatisés
   • Reporting Analyst (stage) — Mamda Assurance Maroc (avr-août 2024) : apps web PHP/MySQL, reporting automatisé Power BI, optimisation interfaces data
   • Data Analyst — BNC Corporation Maroc (sept 2023-avr 2024) : KPI commerciaux, tableaux de bord Power BI hebdo/mensuels, analyses EViews/Excel
-- Projet perso marquant : agent IA autonome en Python qui scrape des offres d'alternance, les score avec Claude API, postule automatiquement et pilote tout via Telegram — déployé sur Railway
-- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker (bases), Make, ChatGPT API
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker, Make, ChatGPT API, Claude API
 - Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
 - GitHub : https://github.com/Alibenaqa | Paris (75011)
+- Projets GitHub :
+  • Alternance Agent : agent IA autonome (Python, Claude API, Playwright, Railway, Telegram, Flask) — scrape 8 plateformes, score les offres, postule automatiquement avec CV, relances auto, dashboard web
+  • AniData Lab : pipeline ETL end-to-end (Python, Elasticsearch, Logstash, Grafana, Apache Airflow, Docker) — 17 562 titres anime + 57M ratings, indexation quotidienne
+  • Dream Interpreter : app IA générative (Python, Groq/Llama-3.3-70b, Whisper, Stable Diffusion XL, Streamlit) — analyse de rêves par LLM, transcription audio, génération d'images
+  • Data Refinement : nettoyage données (Python, Pandas, Jupyter) — pipeline 3 étapes sur dataset corrompu
+  • Jeu de dames : Python/Pygame, architecture OOP complète
 
 RÈGLES D'ÉCRITURE — respecte-les toutes sans exception :
 1. Commence directement par "Bonjour," (pas "Madame, Monsieur", pas d'accroche marketing)

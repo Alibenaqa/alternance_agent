@@ -506,6 +506,13 @@ alternance_agent/
 
 **Compétences :** Python · SQL · Power BI · ETL · JavaScript · Node.js · React · PHP · MySQL · PostgreSQL · MongoDB · Git · Docker (bases) · Make · ChatGPT API · Claude API
 
+**Projets :**
+- **[Alternance Agent](https://github.com/Alibenaqa/alternance_agent)** — Agent IA autonome de recherche d'alternance (Python, Claude API, Playwright, Railway, Telegram, Flask) : scrape 8 plateformes, score les offres, postule automatiquement avec CV joint, relances auto, dashboard web
+- **[AniData Lab](https://github.com/Alibenaqa/anidata_lab)** — Pipeline ETL end-to-end sur 17 562 titres anime + 57M ratings (Python, Pandas, Elasticsearch, Logstash, Grafana, Apache Airflow 2.x, Docker) : DAGs d'indexation quotidienne, détection d'anomalies, dashboards Grafana
+- **[Dream Interpreter](https://github.com/Alibenaqa/dream_interpreter)** — App IA générative d'analyse de rêves (Python, Groq API/Llama-3.3-70b, Whisper, Stable Diffusion XL, Streamlit) : transcription audio, interprétation LLM, génération d'images, journal de rêves
+- **[Data Refinement](https://github.com/Alibenaqa/Data_refinement)** — Pipeline de nettoyage et contrôle qualité de données (Python, Pandas, NumPy, Jupyter) : 3 étapes exploration/nettoyage/standardisation sur dataset café corrompu
+- **[Jeu de dames](https://github.com/Alibenaqa/jeu_de_dame)** — Jeu de dames complet en Python/Pygame, architecture orientée objet, séparation logique de jeu / interface graphique
+
 **Langues :** Français bilingue · Anglais B2/C1 · Espagnol A1/A2
 
 **Liens :** [GitHub](https://github.com/Alibenaqa) · [LinkedIn](https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/)

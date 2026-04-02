@@ -45,7 +45,7 @@ Postes ciblés : {', '.join(r['poste_cible'])}
 Mobilité : France entière, télétravail/hybride préféré
 Compétences : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker (bases), Make, ChatGPT API, Claude API
 Expériences : Data Analyst freelance Techwin Services (ETL Python), Reporting Analyst stage Mamda Assurance (Power BI/PHP), Data Analyst BNC Corporation (KPI/EViews)
-Projet phare : agent IA autonome de recherche d'alternance (Python, Claude API, Playwright, Railway, Telegram)
+Projets : Alternance Agent (Python/Claude API/Railway/Telegram), AniData Lab (ETL/Airflow/ELK/Docker), Dream Interpreter (LLM/Whisper/Stable Diffusion), Data Refinement (Pandas/Jupyter), Jeu de dames (Python/Pygame/OOP)
 Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
 NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 dès sept. 2026
 """.strip()

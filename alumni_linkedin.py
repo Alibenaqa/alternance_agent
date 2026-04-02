@@ -304,7 +304,7 @@ PROFIL ALI (à mentionner de façon naturelle, pas en liste) :
   Reporting Analyst stage Mamda Assurance Maroc (Power BI, PHP/MySQL, reporting automatisé),
   Data Analyst BNC Corporation Maroc (KPI commerciaux, tableaux de bord EViews/Excel)
 - Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, MongoDB, Git
-- Projet phare : agent IA autonome en Python qui scrape des offres d'alternance, les score avec Claude API et postule automatiquement — déployé sur Railway, piloté via Telegram
+- Projets récents : Alternance Agent (agent IA autonome Python/Claude API/Railway/Telegram qui scrape et postule automatiquement), AniData Lab (pipeline ETL Airflow/Elasticsearch/Docker sur 57M ratings), Dream Interpreter (app IA : LLM Groq + Whisper + Stable Diffusion), Data Refinement (nettoyage données Pandas/Jupyter), Jeu de dames (Python/Pygame/OOP)
 - GitHub : https://github.com/Alibenaqa | Paris (75011)
 
 ALUMNI CONTACTÉ :

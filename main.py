@@ -100,7 +100,8 @@ Postes ciblés : {', '.join(r['poste_cible'])}
 Secteurs préférés : {', '.join(r['secteurs_preferes'])}
 Localisation : {', '.join(r['localisation'])}
 Expériences : Data Analyst freelance Techwin Services (ETL Python), Reporting Analyst stage Mamda Assurance (Power BI/PHP), Data Analyst BNC Corporation (KPI/EViews)
-Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Make, ChatGPT API, Claude API
+Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, PHP, MySQL, PostgreSQL, MongoDB, Git, Docker, Make, ChatGPT API, Claude API
+Projets : Alternance Agent (Python/Claude API/Railway), AniData Lab (ETL/Airflow/ELK/Docker), Dream Interpreter (LLM/Whisper/Stable Diffusion), Data Refinement (Pandas), Jeu de dames (Python/Pygame)
 Langues : Français bilingue, Anglais B2/C1, Espagnol A1/A2
 
 === STATS ===
