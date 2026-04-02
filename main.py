@@ -15,6 +15,7 @@ import anthropic
 import pypdf
 import requests as req
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import Conflict, NetworkError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -761,8 +762,26 @@ def main():
         days=(0,),  # 0 = lundi
     )
 
+    # Gestion des erreurs (conflit Railway au redéploiement)
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if isinstance(context.error, Conflict):
+            log.warning("⚠️  Conflit Telegram (redéploiement en cours) — l'ancienne instance s'arrête, patience...")
+        elif isinstance(context.error, NetworkError):
+            log.warning(f"⚠️  Erreur réseau Telegram (transitoire) : {context.error}")
+        else:
+            log.error(f"Erreur bot : {context.error}", exc_info=context.error)
+
+    app.add_error_handler(error_handler)
+
     log.info(f"🤖 Bot démarré — cycle auto toutes les {INTERVALLE_HEURES}h")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES,
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=30,
+        pool_timeout=30,
+    )
 
 
 if __name__ == "__main__":
