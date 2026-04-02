@@ -427,7 +427,17 @@ def run_linkedin_easy_apply() -> dict:
     stats = {"candidatures": 0, "echecs": 0}
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",               # requis dans les conteneurs Docker/Railway
+                "--disable-dev-shm-usage",    # évite les crash mémoire partagée
+                "--disable-gpu",
+                "--disable-setuid-sandbox",
+                "--no-first-run",
+                "--no-zygote",
+            ],
+        )
         ctx = browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -441,6 +451,7 @@ def run_linkedin_easy_apply() -> dict:
         # Connexion
         if not _login(page):
             print("   ❌ Impossible de se connecter à LinkedIn")
+            _telegram("⚠️ <b>LinkedIn Easy Apply</b> : connexion échouée — vérifie les identifiants Railway (LINKEDIN_EMAIL / LINKEDIN_PASSWORD)")
             browser.close()
             return stats
 

@@ -188,7 +188,10 @@ def candidater_wttj(offre: dict, mem: Memory) -> bool:
 
         print(f"   🌐 Playwright → {offre['url']}")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-zygote"],
+            )
             page = browser.new_page()
             page.goto(offre["url"], timeout=15000)
             page.wait_for_load_state("networkidle", timeout=10000)
