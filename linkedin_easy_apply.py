@@ -389,6 +389,8 @@ def run_linkedin_easy_apply() -> dict:
         print("⚠️  Playwright non installé — skip Easy Apply")
         return {"candidatures": 0, "echecs": 0}
 
+    from turso_sync import deja_postule_turso
+
     mem = Memory()
 
     # Offres LinkedIn éligibles (pas encore postulées, score >= 0.75)
@@ -400,9 +402,21 @@ def run_linkedin_easy_apply() -> dict:
               AND score_pertinence >= ?
             ORDER BY score_pertinence DESC
             LIMIT ?
-        """, (SCORE_MIN, MAX_PAR_CYCLE)).fetchall()
+        """, (SCORE_MIN, MAX_PAR_CYCLE * 2)).fetchall()
 
-    offres = [dict(o) for o in offres]
+    # Filtre anti-doublon Turso
+    offres_filtrees = []
+    for o in offres:
+        o = dict(o)
+        if deja_postule_turso(o["url"]):
+            print(f"   ⏭️  Déjà postulé (Turso) : {o['titre']}")
+            mem.update_offre_statut(o["id"], "postulé", "Déjà postulé (Turso)")
+        else:
+            offres_filtrees.append(o)
+        if len(offres_filtrees) >= MAX_PAR_CYCLE:
+            break
+
+    offres = offres_filtrees
     print(f"\n🔗 LinkedIn Easy Apply — {len(offres)} offre(s) éligible(s)")
 
     if not offres:

@@ -35,7 +35,7 @@ from scorer import scorer_offres_nouvelles
 from notifier import notifier_offres, alerter_offres_top
 from reponses import run_suivi_candidatures
 from emailer import envoyer_email
-from candidater import run_candidatures_auto, envoyer_resume_quotidien
+from candidater import run_candidatures_auto, envoyer_resume_quotidien, envoyer_stats_hebdo
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
 from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
@@ -309,6 +309,13 @@ async def job_resume_quotidien(context: ContextTypes.DEFAULT_TYPE):
     import asyncio
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, envoyer_resume_quotidien)
+
+
+async def job_stats_hebdo(context: ContextTypes.DEFAULT_TYPE):
+    """Bilan hebdomadaire chaque lundi à 09h."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, envoyer_stats_hebdo)
 
 
 # ────────────────────────────────────────────────
@@ -745,6 +752,13 @@ def main():
     app.job_queue.run_daily(
         job_resume_quotidien,
         time=datetime.strptime("20:00", "%H:%M").time(),
+    )
+
+    # Bilan hebdomadaire chaque lundi à 09h
+    app.job_queue.run_daily(
+        job_stats_hebdo,
+        time=datetime.strptime("09:00", "%H:%M").time(),
+        days=(0,),  # 0 = lundi
     )
 
     log.info(f"🤖 Bot démarré — cycle auto toutes les {INTERVALLE_HEURES}h")

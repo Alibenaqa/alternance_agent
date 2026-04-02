@@ -364,17 +364,17 @@ def envoyer_resume_quotidien():
     mem = Memory()
     stats = mem.get_stats()
 
-    # Candidatures du jour
     with mem._connect() as conn:
+        # Candidatures du jour
         cands_jour = conn.execute("""
-            SELECT c.objet_email, c.email_dest, c.canal, o.titre, o.entreprise
+            SELECT c.canal, o.titre, o.entreprise, o.score_pertinence
             FROM candidatures c
             LEFT JOIN offres o ON c.offre_id = o.id
             WHERE date(c.date_candidature) = date('now')
             ORDER BY c.date_candidature DESC
         """).fetchall()
 
-        # Réponses reçues (offres passées en statut réponse/entretien)
+        # Réponses reçues
         reponses = conn.execute("""
             SELECT titre, entreprise, statut, notes
             FROM offres
@@ -382,25 +382,48 @@ def envoyer_resume_quotidien():
               AND date(date_scrape) >= date('now', '-7 days')
         """).fetchall()
 
-    # Construire le message
+        # Offres intéressantes découvertes aujourd'hui
+        offres_aujourd_hui = conn.execute("""
+            SELECT COUNT(*) as nb FROM offres
+            WHERE statut = 'intéressant'
+              AND date(date_scrape) = date('now')
+        """).fetchone()["nb"]
+
+        # Répartition par source
+        sources = conn.execute("""
+            SELECT source, COUNT(*) as nb FROM offres
+            WHERE statut = 'intéressant'
+            GROUP BY source ORDER BY nb DESC
+        """).fetchall()
+
     nb_cands = len(cands_jour)
     msg = f"📊 <b>Résumé du {datetime.now().strftime('%d/%m/%Y')}</b>\n\n"
 
+    # Stats du jour
+    msg += f"🔍 <b>Aujourd'hui :</b> {offres_aujourd_hui} nouvelles offres intéressantes\n"
+    msg += f"📤 <b>Candidatures envoyées :</b> {nb_cands}\n"
     if nb_cands > 0:
-        msg += f"📤 <b>{nb_cands} candidature(s) envoyée(s) aujourd'hui :</b>\n"
-        for c in cands_jour[:8]:
-            canal_icon = "📧" if c["canal"] == "email" else "🌐"
-            msg += f"  {canal_icon} {c['titre']} — {c['entreprise']}\n"
-    else:
-        msg += "📤 Aucune candidature envoyée aujourd'hui.\n"
+        for c in cands_jour[:6]:
+            canal_icon = {"email": "📧", "formulaire_web": "🌐", "linkedin_easy_apply": "🔗"}.get(c["canal"], "📤")
+            pct = int((c["score_pertinence"] or 0) * 100)
+            msg += f"  {canal_icon} {c['titre']} — {c['entreprise']} ({pct}%)\n"
 
+    # Réponses
     if reponses:
         msg += f"\n📬 <b>Réponses reçues :</b>\n"
         for r in reponses:
             icon = "🎉" if r["statut"] == "entretien" else "📩"
             msg += f"  {icon} {r['entreprise']} — {r['statut']}\n"
 
-    msg += f"\n📈 Total : {stats['total_candidatures']} candidatures | {stats['entretiens']} entretiens"
+    # Totaux globaux
+    msg += f"\n─────────────────\n"
+    msg += f"📈 Total : <b>{stats['total_candidatures']}</b> candidatures | <b>{stats['entretiens']}</b> entretiens\n"
+    msg += f"Taux de réponse : <b>{stats.get('taux_reponse', 0)}%</b>\n"
+
+    # Sources actives
+    if sources:
+        msg += f"\n📡 <b>Sources :</b> "
+        msg += " | ".join(f"{s['source']} ({s['nb']})" for s in sources[:5])
 
     req.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -408,6 +431,118 @@ def envoyer_resume_quotidien():
         timeout=10,
     )
     print("✅ Résumé quotidien envoyé sur Telegram")
+
+
+def envoyer_stats_hebdo():
+    """Envoie un bilan hebdomadaire complet chaque lundi sur Telegram."""
+    mem = Memory()
+    stats = mem.get_stats()
+
+    with mem._connect() as conn:
+        # Candidatures de la semaine
+        cands_semaine = conn.execute("""
+            SELECT c.canal, o.titre, o.entreprise, o.score_pertinence,
+                   date(c.date_candidature) as jour
+            FROM candidatures c
+            LEFT JOIN offres o ON c.offre_id = o.id
+            WHERE c.date_candidature >= datetime('now', '-7 days')
+            ORDER BY c.date_candidature DESC
+        """).fetchall()
+
+        # Nouvelles offres cette semaine
+        nb_offres_semaine = conn.execute("""
+            SELECT COUNT(*) as nb FROM offres
+            WHERE date_scrape >= datetime('now', '-7 days')
+        """).fetchone()["nb"]
+
+        nb_interessantes_semaine = conn.execute("""
+            SELECT COUNT(*) as nb FROM offres
+            WHERE statut = 'intéressant'
+              AND date_scrape >= datetime('now', '-7 days')
+        """).fetchone()["nb"]
+
+        # Top offres de la semaine
+        top_offres = conn.execute("""
+            SELECT titre, entreprise, score_pertinence, source
+            FROM offres
+            WHERE statut = 'intéressant'
+              AND date_scrape >= datetime('now', '-7 days')
+            ORDER BY score_pertinence DESC LIMIT 5
+        """).fetchall()
+
+        # Répartition canaux cette semaine
+        canaux = conn.execute("""
+            SELECT canal, COUNT(*) as nb FROM candidatures
+            WHERE date_candidature >= datetime('now', '-7 days')
+            GROUP BY canal ORDER BY nb DESC
+        """).fetchall()
+
+        # Entretiens obtenus cette semaine
+        entretiens_semaine = conn.execute("""
+            SELECT o.entreprise, o.titre, c.date_candidature
+            FROM offres o
+            LEFT JOIN candidatures c ON c.offre_id = o.id
+            WHERE o.statut = 'entretien'
+              AND c.date_candidature >= datetime('now', '-7 days')
+        """).fetchall()
+
+        # Alumni contactés cette semaine
+        alumni_semaine = conn.execute("""
+            SELECT COUNT(*) as nb FROM alumni
+            WHERE statut_contact = 'mail envoyé'
+              AND date_contact >= datetime('now', '-7 days')
+        """).fetchone()["nb"] if _table_existe(conn, "alumni") else 0
+
+    nb_cands = len(cands_semaine)
+    from datetime import datetime as dt
+    semaine_str = dt.now().strftime("semaine du %d/%m/%Y")
+
+    msg = f"📅 <b>Bilan hebdo — {semaine_str}</b>\n\n"
+
+    # Chiffres clés
+    msg += f"🔍 <b>Offres trouvées :</b> {nb_offres_semaine} total | {nb_interessantes_semaine} intéressantes\n"
+    msg += f"📤 <b>Candidatures :</b> {nb_cands} cette semaine\n"
+    if entretiens_semaine:
+        msg += f"🎉 <b>Entretiens obtenus :</b> {len(entretiens_semaine)}\n"
+        for e in entretiens_semaine:
+            msg += f"  → {e['entreprise']} — {e['titre']}\n"
+    msg += f"🎓 <b>Alumni contactés :</b> {alumni_semaine}\n"
+
+    # Canaux utilisés
+    if canaux:
+        msg += f"\n📡 <b>Canaux :</b>\n"
+        icons = {"email": "📧", "formulaire_web": "🌐", "linkedin_easy_apply": "🔗"}
+        for c in canaux:
+            msg += f"  {icons.get(c['canal'], '📤')} {c['canal']} : {c['nb']}\n"
+
+    # Top 5 offres
+    if top_offres:
+        msg += f"\n🏆 <b>Top offres de la semaine :</b>\n"
+        for o in top_offres:
+            pct = int(o["score_pertinence"] * 100)
+            emoji = "🔥" if pct >= 90 else "✅" if pct >= 80 else "👍"
+            msg += f"  {emoji} {o['titre']} — {o['entreprise']} ({pct}%)\n"
+
+    # Totaux cumulés
+    msg += f"\n─────────────────\n"
+    msg += f"📊 <b>Totaux cumulés :</b>\n"
+    msg += f"  Candidatures : <b>{stats['total_candidatures']}</b>\n"
+    msg += f"  Entretiens : <b>{stats['entretiens']}</b>\n"
+    msg += f"  Taux réponse : <b>{stats.get('taux_reponse', 0)}%</b>\n"
+
+    req.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+        timeout=10,
+    )
+    print("✅ Bilan hebdomadaire envoyé sur Telegram")
+
+
+def _table_existe(conn, nom: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (nom,)
+    ).fetchone()
+    return row is not None
 
 
 if __name__ == "__main__":
