@@ -17,13 +17,13 @@
     "ecole": "École Hetic",
     "lieu": "Montreuil, France",
     "diplome": "Bachelor Data & Intelligence Artificielle",
-    "programme": "Programme Grande École de la Tech",
+    "programme": "bachelor DATA & Intelligence Artificielle",
     "annee_actuelle": 2,
     "niveau_actuel": "Bac+2 (Bachelor 2e année Data & IA)",
-    "niveau_rentree_2026": "Bac+3 (Bachelor 3e année — à partir de septembre 2026)",
+    "niveau_rentree_2026-2027": "Bac+3 (Bachelor 3e année — à partir d'octobre 2026)",
     "date_debut_alternance": "Octobre 2026",
     "duree_contrat": "12 à 36 mois",
-    "rythme_souhaite": "3 jours entreprise / 2 jours école",
+    "rythme_souhaite": "3 semaines entreprise / une semaine école",
     "formations_precedentes": [
       {
         "etablissement": "Université Ibn Tofail",
@@ -87,14 +87,31 @@
 
   "projets_academiques": [
     {
+      "nom": "Agent IA de recherche d'alternance",
+      "description": "Bot Python autonome qui scrape les offres, contacte les alumnis et postule automatiquement",
+      "technologies": ["Python", "Playwright", "Claude API", "SQLite", "Telegram Bot"]
+    },
+    {
+      "nom": "Agent IA qui interprète de Rêves",
+      "description": "Application interactive qui analyse et interprète les rêves décrits par l'utilisateur, génère une interprétation symbolique et une illustration visuelle, et conserve un journal des rêves.",
+      "technologies": ["python", "Groq (llama-3.3-70b-versatile)", "Groq (whisper-large-v3)", "Hugging Face (stable-diffusion-xl)", "streamlit", "python-dotenv"]
+      
+     } ,
+     {
+      "nom": "Jeu de dames en Python",
+      "description": "Projet de développement d’un jeu de dames en Python en utilisant la bibliothèque Pygame.",
+      "technologies":["python","pygame","minimaxAi","HTML"]
+      },
+
+    {
       "nom": "Site Espace des Arts (salle de cinéma)",
       "description": "Design et développement complet du site",
-      "technologies": ["HTML", "CSS", "JavaScript"]
+      "technologies": ["HTML", "CSS","Figla", "JavaScript"]
     },
     {
       "nom": "Page live Betclic",
       "description": "Conception UI/UX, stratégie marketing, communication et digitalisation",
-      "technologies": ["UI/UX", "Marketing digital"]
+      "technologies": ["UI/UX", "Marketing digital","Adobe Photoshop","Figma","API",""]
     },
     {
       "nom": "Bot Discord IA",
@@ -110,12 +127,9 @@
       "nom": "Application de vote",
       "description": "Système de vote avec gestion et analyse des données utilisateurs",
       "technologies": ["Python", "SQL"]
-    },
-    {
-      "nom": "Agent IA de recherche d'alternance",
-      "description": "Bot Python autonome qui scrape les offres, contacte les alumni et postule automatiquement",
-      "technologies": ["Python", "Playwright", "Claude API", "SQLite", "Telegram Bot"]
     }
+    
+    
   ],
 
   "competences_techniques": {
