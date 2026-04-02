@@ -120,8 +120,42 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
 # LECTURE DES RÉPONSES VIA IMAP
 # ────────────────────────────────────────────────
 
-def lire_reponses(jours: int = 7) -> list[dict]:
-    """Lit les emails non lus reçus dans les `jours` derniers."""
+def _ids_deja_traites() -> set:
+    """Retourne les message-IDs déjà traités (stockés en DB locale)."""
+    try:
+        mem = Memory()
+        with mem._connect() as conn:
+            rows = conn.execute(
+                "SELECT objet FROM emails_log WHERE type_email = 'reponse_traitee'"
+            ).fetchall()
+            return {str(r[0]) for r in rows}
+    except Exception:
+        return set()
+
+
+def _marquer_traite(message_id: str):
+    """Marque un message-ID comme traité pour ne pas le retraiter au prochain cycle."""
+    if not message_id:
+        return
+    try:
+        mem = Memory()
+        mem.log_email({
+            "destinataire": "inbox",
+            "objet": message_id,
+            "corps": "",
+            "type_email": "reponse_traitee",
+            "ref_id": None,
+            "ref_type": "inbox",
+        })
+    except Exception:
+        pass
+
+
+def lire_reponses(jours: int = 3) -> list[dict]:
+    """
+    Lit les emails reçus dans les `jours` derniers — lus ET non-lus.
+    Filtre uniquement ceux pas encore traités (via message-ID en DB).
+    """
     reponses = []
     try:
         mail = imaplib.IMAP4_SSL(IMAP_HOST)
@@ -129,52 +163,102 @@ def lire_reponses(jours: int = 7) -> list[dict]:
         mail.select("inbox")
 
         depuis = (datetime.now() - timedelta(days=jours)).strftime("%d-%b-%Y")
-        _, data = mail.search(None, f'(UNSEEN SINCE "{depuis}")')
+        # Cherche TOUS les emails récents (SEEN + UNSEEN) — pas seulement non-lus
+        _, data = mail.search(None, f'SINCE "{depuis}"')
+
+        deja_traites = _ids_deja_traites()
 
         for num in data[0].split():
             _, msg_data = mail.fetch(num, "(RFC822)")
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
 
-            sujet_raw, encoding = decode_header(msg["Subject"])[0]
+            # Identifiant unique de cet email
+            message_id = msg.get("Message-ID", str(num))
+
+            # Skip si déjà traité
+            if message_id in deja_traites:
+                continue
+
+            sujet_raw, encoding = decode_header(msg["Subject"] or "")[0]
             if isinstance(sujet_raw, bytes):
                 sujet = sujet_raw.decode(encoding or "utf-8", errors="ignore")
             else:
                 sujet = sujet_raw or ""
 
             expediteur = msg.get("From", "")
+
+            # Skip nos propres emails envoyés (BCC)
+            if GMAIL_ADDRESS in expediteur:
+                continue
+
             corps = ""
             if msg.is_multipart():
                 for part in msg.walk():
                     if part.get_content_type() == "text/plain":
-                        corps = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                        break
+                        try:
+                            corps = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                            break
+                        except Exception:
+                            pass
             else:
-                corps = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+                try:
+                    corps = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
 
             reponses.append({
+                "message_id": message_id,
                 "from": expediteur,
                 "subject": sujet,
-                "body": corps[:1000],
+                "body": corps[:1500],
                 "date": msg.get("Date", ""),
+                "in_reply_to": msg.get("In-Reply-To", ""),
             })
 
         mail.logout()
     except Exception as e:
-        print(f"   ❌ Erreur lecture emails : {e}")
+        print(f"   ❌ Erreur lecture emails IMAP : {e}")
 
     return reponses
 
 
 def verifier_reponses_recruteurs() -> list[dict]:
-    """Filtre les emails non lus qui semblent être des réponses recruteurs."""
-    reponses = lire_reponses(jours=7)
-    mots_cles = ["candidature", "alternance", "entretien", "poste", "profil",
-                 "recrutement", "offre", "cv", "application", "interview"]
-    return [
-        r for r in reponses
-        if any(mot in (r["subject"] + r["body"]).lower() for mot in mots_cles)
+    """
+    Filtre les emails reçus qui semblent être des réponses recruteurs.
+    Détecte : réponses à nos mails (Re:), mots-clés candidature, et emails directs.
+    """
+    reponses = lire_reponses(jours=3)
+
+    mots_cles_forts = [
+        "candidature", "alternance", "entretien", "recrutement",
+        "offre", "cv", "application", "interview", "poste",
+        "profil", "opportunité", "dossier",
     ]
+    mots_cles_reponse = [
+        "merci", "intéresse", "retenu", "sélectionné", "disponible",
+        "rappeler", "rencontrer", "échange", "appel", "convoqué",
+        "malheureusement", "suite", "retour", "réponse",
+    ]
+
+    pertinents = []
+    for r in reponses:
+        texte = (r["subject"] + " " + r["body"]).lower()
+        sujet = r["subject"].lower()
+
+        # C'est une réponse à un de nos emails (Re: dans le sujet)
+        est_reply = sujet.startswith("re:") or sujet.startswith("rép:") or r.get("in_reply_to")
+
+        # Contient des mots-clés forts
+        a_mots_forts = any(mot in texte for mot in mots_cles_forts)
+
+        # Contient des mots de réponse (intérêt, refus, suite...)
+        a_mots_reponse = any(mot in texte for mot in mots_cles_reponse)
+
+        if est_reply or a_mots_forts or (a_mots_reponse and len(r["body"]) > 50):
+            pertinents.append(r)
+
+    return pertinents
 
 
 if __name__ == "__main__":

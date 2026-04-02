@@ -17,7 +17,7 @@ from datetime import datetime
 import anthropic
 
 from memory import Memory
-from emailer import verifier_reponses_recruteurs, envoyer_email
+from emailer import verifier_reponses_recruteurs, envoyer_email, _marquer_traite
 
 TELEGRAM_TOKEN    = os.environ.get("TELEGRAM_TOKEN", "8658482373:AAH3Oxk6of_JWCVXRBXn_L4X9cIaHHMcDrc")
 TELEGRAM_CHAT_ID  = os.environ.get("TELEGRAM_CHAT_ID", "7026975488")
@@ -153,6 +153,9 @@ def traiter_reponses_recruteurs() -> int:
 
         analyse = analyser_reponse(email)
         type_rep = analyse.get("type", "autre")
+
+        # Marque toujours comme traité (même si "autre") pour ne pas retraiter
+        _marquer_traite(email.get("message_id", ""))
 
         if type_rep == "autre":
             print(f"   ⏭️  Email non pertinent, ignoré")
