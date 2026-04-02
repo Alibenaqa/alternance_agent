@@ -46,70 +46,44 @@ def generer_email_candidature(offre: dict) -> dict:
     r = profil["recherche_alternance"]
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    prompt = f"""Rédige un email de candidature percutant et personnalisé pour Ali Benaqa.
+    prompt = f"""Tu es Ali Benaqa, étudiant en Bachelor Data & IA à Hetic (Montreuil), 22 ans.
+Tu écris toi-même un email de candidature pour le poste suivant.
 
-PROFIL COMPLET D'ALI :
-- Formation : Bachelor Data & IA — Hetic, Grande École de la Tech (Montreuil)
-- Niveau actuel : Bac+2, sera en Bac+3 à partir d'octobre 2026
-- Disponibilité : {r['disponibilite']} | Durée : {r['duree_contrat']} | Rythme : 3j entreprise / 2j école
+POSTE : {offre['titre']} chez {offre['entreprise']} ({offre['localisation']})
+DESCRIPTION : {(offre.get('description') or 'Non précisée')[:600]}
 
-EXPÉRIENCES :
-  1. Data Analyst freelance — Techwin Services (mars-juin 2025)
-     → Pipelines ETL Python, traitement données hétérogènes (CSV, SQL, API), pipelines automatisés
-  2. Reporting Analyst (stage) — Mamda Assurance Maroc (avr-août 2024)
-     → Apps web PHP/MySQL, reporting automatisé Power BI, optimisation interfaces data
-  3. Data Analyst — BNC Corporation Maroc (sept 2023-avr 2024)
-     → KPI commerciaux, tableaux de bord Power BI hebdo/mensuels, analyses EViews/Excel
+TON PROFIL :
+- Bac+2 actuellement, Bac+3 dès octobre 2026. Rythme : 3j entreprise / 2j école.
+- Expériences data : Data Analyst chez Techwin Services (ETL Python, pipelines), stage Mamda Assurance Maroc (Power BI, reporting automatisé), Data Analyst BNC Corporation (KPI, tableaux de bord).
+- Projet perso marquant : agent IA autonome en Python qui scrape des offres d'alternance, les score, postule automatiquement et envoie les candidatures par email — déployé sur Railway, piloté via Telegram.
+- Stack selon le poste : Python/SQL/ETL/Power BI (data), Claude API/LLM/automatisation (IA), React/Node.js/JS (dev web).
+- GitHub : https://github.com/Alibenaqa
 
-PROJETS :
-  - Agent IA autonome de recherche d'alternance (Python, Claude API, Playwright, Telegram, SQLite)
-  - Bot Discord IA interactif (Node.js, ChatGPT API)
-  - Site cinéma Espace des Arts, page live Betclic (UI/UX, HTML/CSS/JS)
-  - Application de vote avec analyse données (Python, SQL)
+RÈGLES D'ÉCRITURE — respecte-les toutes sans exception :
+1. Commence directement par "Bonjour," (pas "Madame, Monsieur", pas d'accroche marketing)
+2. 3 paragraphes courts maximum, 130-160 mots au total — la concision montre le respect du temps du recruteur
+3. Paragraphe 1 (2-3 phrases) : qui tu es + pourquoi CETTE entreprise ou CE poste t'intéresse spécifiquement. Sois précis, pas générique. Si la description mentionne une techno, un secteur, un projet concret → rebondis dessus.
+4. Paragraphe 2 (2-3 phrases) : 1 ou 2 expériences/projets directement utiles pour CE poste. Cite un fait concret (une techno, un résultat, un projet), pas une liste de compétences.
+5. Paragraphe 3 (1-2 phrases) : disponibilité + invitation à échanger. Ton naturel, pas de formule creuse comme "dans l'attente de votre retour".
+6. INTERDIT : "je me permets de", "n'hésitez pas à", "dynamique", "motivé", "passionné", "je suis convaincu que", "opportunité", "en effet", "ainsi", "de ce fait", listes à puces dans le corps
+7. Ton : comme si tu écrivais à quelqu'un que tu ne connais pas mais à qui tu parles directement — ni trop formel, ni familier
+8. Signature simple sur 2 lignes :
+   Ali Benaqa
+   +33 6 67 67 79 37 | alibenaqa123@gmail.com | github.com/Alibenaqa
+9. Après la signature, ajoute exactement cette ligne :
+   PS : Cet email a été envoyé par l'agent IA que j'ai développé pour automatiser ma recherche — mon CV est joint.
 
-COMPÉTENCES :
-  - Data : Python, SQL, Power BI, ETL, EViews, pipelines de données, KPI
-  - IA/ML : Claude API, ChatGPT API, intégration LLM, Make/Zapier, automatisation
-  - Dev : JavaScript, Node.js, React, PHP, HTML/CSS, Express.js
-  - Bases de données : MySQL, PostgreSQL, MongoDB
-  - Outils : Git/GitHub, Docker (bases), Postman, Jira, GitHub Actions
-  - Langues : français bilingue, anglais B2/C1
+OBJET : court, factuel, sans fioriture (ex: "Alternance {offre['titre']} — Ali Benaqa, oct. 2026")
 
-LIENS :
-  - GitHub : https://github.com/Alibenaqa
-  - LinkedIn : https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/
-
-OFFRE CIBLÉE :
-- Poste : {offre['titre']}
-- Entreprise : {offre['entreprise']}
-- Localisation : {offre['localisation']}
-- Description : {(offre.get('description') or 'Non précisée')[:800]}
-
-INSTRUCTIONS :
-- Style : professionnel mais humain, direct, original — pas de langue de bois
-- Longueur : 200-250 mots
-- Commence par une accroche forte et personnalisée (pas "Madame, Monsieur" générique)
-- Adapte le contenu au TYPE de poste :
-  * Data Scientist/ML → met en avant Python, pipelines, Claude API, agent IA
-  * Data Engineer → met en avant ETL, pipelines, SQL, automatisation
-  * AI Developer/IA → met en avant agent IA, LLM API, automatisation, bots
-  * Dev Web → met en avant React, Node.js, JavaScript, projets web
-  * Data Analyst → met en avant Power BI, KPI, tableaux de bord, EViews
-- Si l'offre demande Bac+3 : mentionne "dès octobre 2026 je serai en 3e année (Bac+3)"
-- Met en avant 2-3 éléments concrets du profil en lien direct avec CE poste
-- Avant la signature, ajoute ce paragraphe EXACTEMENT :
-  "PS : Ce message a été rédigé et envoyé par l'agent IA que j'ai développé pour automatiser ma recherche d'alternance. Pour plus de détails sur mon profil : GitHub → https://github.com/Alibenaqa | LinkedIn → https://www.linkedin.com/in/mohamed-ali-benaqa-209630264/ | Mon CV est joint à cet email."
-- Signature : "Ali Benaqa | +33 6 67 67 79 37 | alibenaqa123@gmail.com"
-- Réponds avec ce format exact :
-
-OBJET: [sujet court et percutant, max 60 caractères]
+Réponds avec ce format exact :
+OBJET: [objet]
 ---
 [corps de l'email]"""
 
     try:
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=600,
+            max_tokens=700,
             messages=[{"role": "user", "content": prompt}],
         )
         texte = resp.content[0].text.strip()
