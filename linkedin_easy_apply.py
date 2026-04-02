@@ -74,7 +74,7 @@ Poste : {offre.get('titre', '')}
 Entreprise : {offre.get('entreprise', '')}
 
 PROFIL ALI :
-- Étudiant Bachelor Data & IA, Hetic, 2e année (Bac+3 en oct 2026)
+- Étudiant Bachelor Data & IA, Hetic, 2e année actuellement (3e année dès septembre 2026)
 - 3 exp pro : Data Analyst Techwin (ETL Python), Stage Mamda (Power BI, PHP), BNC Corp (KPI)
 - Compétences : Python, SQL, Power BI, ETL, LLM API, automatisation
 - Disponibilité : Octobre 2026
@@ -83,7 +83,7 @@ Question du formulaire : "{question}"
 
 Réponds en 1-2 phrases MAX, directement utilisable dans le champ. Pas de guillemets autour.
 Si c'est une question sur les années d'expérience → répondre "2 ans"
-Si c'est sur le niveau d'études → "Bac+2, Bac+3 en octobre 2026"
+Si c'est sur le niveau d'études → "Bac+2 actuellement, Bac+3 dès septembre 2026"
 Si c'est sur la disponibilité → "Octobre 2026"
 Si c'est sur le salaire → "Grille alternance légale"
 """

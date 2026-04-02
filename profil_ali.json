@@ -20,7 +20,7 @@
     "programme": "Programme Grande École de la Tech",
     "annee_actuelle": 2,
     "niveau_actuel": "Bac+2 (Bachelor 2e année Data & IA)",
-    "niveau_rentree_2026": "Bac+3 (Bachelor 3e année — à partir d'octobre 2026)",
+    "niveau_rentree_2026": "Bac+3 (Bachelor 3e année — à partir de septembre 2026)",
     "date_debut_alternance": "Octobre 2026",
     "duree_contrat": "12 à 36 mois",
     "rythme_souhaite": "3 jours entreprise / 2 jours école",
@@ -199,8 +199,8 @@
       "Formation spécialisée Data & IA à Hetic (Grande École de la Tech)",
       "Proactif : construction d'un agent IA autonome de recherche d'alternance"
     ],
-    "accroche_personnelle": "Étudiant en 3e année de Bachelor Data & IA à Hetic, j'ai déjà 3 expériences en data analytics (ETL, Power BI, KPI) et je construis des outils IA en Python. Je cherche une alternance de 12 à 36 mois à partir d'octobre 2026 pour continuer à progresser sur des projets data concrets.",
-    "template_email_alumni": "Bonjour {prenom},\n\nJe suis Ali Benaqa, étudiant en 3e année de Bachelor Data & IA à Hetic. En voyant votre parcours chez {entreprise}, j'aurais voulu vous poser quelques questions sur votre expérience et le marché de l'alternance data.\n\nJe suis actuellement à la recherche d'une alternance à partir d'octobre 2026 et votre retour d'expérience m'aiderait vraiment.\n\nSeriez-vous disponible pour un échange rapide de 15 minutes ?\n\nCordialement,\nAli Benaqa\nHetic — Bachelor Data & IA\n+33 6 67 67 79 37"
+    "accroche_personnelle": "Étudiant en 2e année de Bachelor Data & IA à Hetic (3e année dès septembre 2026), j'ai déjà 3 expériences en data analytics (ETL, Power BI, KPI) et je construis des outils IA en Python. Je cherche une alternance de 12 à 36 mois à partir d'octobre 2026 pour continuer à progresser sur des projets data concrets.",
+    "template_email_alumni": "Bonjour {prenom},\n\nJe suis Ali Benaqa, étudiant en 2e année de Bachelor Data & IA à Hetic (3e année dès septembre 2026). En voyant votre parcours chez {entreprise}, j'aurais voulu vous poser quelques questions sur votre expérience et le marché de l'alternance data.\n\nJe suis actuellement à la recherche d'une alternance à partir d'octobre 2026 et votre retour d'expérience m'aiderait vraiment.\n\nSeriez-vous disponible pour un échange rapide de 15 minutes ?\n\nCordialement,\nAli Benaqa\nHetic — Bachelor Data & IA\n+33 6 67 67 79 37"
   },
 
   "meta": {

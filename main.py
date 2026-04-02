@@ -94,7 +94,7 @@ def charger_contexte() -> str:
 Tu es intégré dans Telegram. Tu tutoies Ali. Tu es direct, concis, efficace.
 
 === PROFIL ===
-Formation : Bachelor Data & IA — Hetic (3e année)
+Formation : Bachelor Data & IA — Hetic (2e année, 3e année dès sept. 2026)
 Disponibilité : {r['disponibilite']} | Durée : {r['duree_contrat']}
 Postes ciblés : {', '.join(r['poste_cible'])}
 Secteurs préférés : {', '.join(r['secteurs_preferes'])}

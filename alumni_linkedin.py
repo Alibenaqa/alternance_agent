@@ -296,10 +296,10 @@ def generer_email_alumni(alumnus: dict) -> dict:
 CONTEXTE :
 Ali est étudiant en 2e année de Bachelor Data & IA à Hetic (Grande École de la Tech, Montreuil).
 Il contacte un alumni Hetic pour demander de l'aide dans sa recherche d'alternance.
-Il sera en 3e année / Bac+3 à partir d'octobre 2026.
+Il sera en 3e année (Bac+3) à partir de septembre 2026.
 
 PROFIL ALI (à mentionner de façon naturelle, pas en liste) :
-- Étudiant Bachelor Data & IA, Hetic — 2e année (Bac+3 en oct 2026)
+- Étudiant Bachelor Data & IA, Hetic — 2e année actuellement (3e année dès sept. 2026)
 - 3 expériences professionnelles en data : Techwin Services (ETL, Python freelance),
   stage Mamda Assurance (reporting Power BI, PHP/MySQL), BNC Corporation (KPI, tableaux de bord)
 - Compétences : Python, SQL, Power BI, ETL, LLM API (Claude, ChatGPT)

@@ -40,7 +40,7 @@ def resumer_profil(profil: dict) -> str:
     return f"""
 Candidat : {profil['identite']['prenom']} {profil['identite']['nom']}
 Formation : {f['diplome']} — {f['ecole']}
-Niveau actuel : Bac+2 | Sera en Bac+3 à partir d'octobre 2026
+Niveau actuel : Bac+2 (2e année Bachelor) | Sera en Bac+3 (3e année) à partir de septembre 2026
 Début alternance : {r['disponibilite']} | Durée : {r['duree_contrat']}
 Rythme : {f['rythme_souhaite']}
 Postes ciblés : {', '.join(r['poste_cible'])}
@@ -48,7 +48,7 @@ Secteurs préférés : {', '.join(r['secteurs_preferes'])}
 Mobilité : France entière (toutes villes acceptées), télétravail/hybride = préféré
 Compétences clés : Python, SQL, Power BI, ETL, API REST, Machine Learning, Node.js, React
 Expériences : Data Analyst (Techwin Services, BNC Corporation), Stage Mamda Assurance
-NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 dès oct 2026
+NOTE : Les offres demandant Bac+3 minimum sont PRIORITAIRES car Ali sera en Bac+3 (3e année Bachelor) dès sept. 2026
 """.strip()
 
 
@@ -79,7 +79,7 @@ Donne un score de pertinence entre 0.0 et 1.0 selon ces critères :
 - 0.5-0.6 : Match moyen (poste connexe, domaine adjacent)
 - 0.0-0.4 : Mauvais match (hors domaine data/IA/dev, trop senior, ou pas alternance)
 
-BONUS +0.05 : si l'offre mentionne explicitement Bac+3 ou Master 1 (Ali sera en Bac+3 dès oct 2026)
+BONUS +0.05 : si l'offre mentionne explicitement Bac+3 ou Master 1 (Ali sera en Bac+3 (3e année Bachelor) dès sept. 2026)
 BONUS +0.05 : si l'offre mentionne télétravail, remote, ou hybride
 MALUS -0.1 : si l'offre exige Bac+4/5 ou Master 2 minimum
 MALUS -0.15 : si ce n'est PAS une alternance (CDI/CDD/stage sauf si titre du poste le confirme clairement)
