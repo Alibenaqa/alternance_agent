@@ -99,11 +99,12 @@ def marquer_postule_turso(url: str, entreprise: str, titre: str):
 
 
 def deja_postule_turso(url: str) -> bool:
-    """Vérifie si on a déjà postulé à cette offre."""
+    """Vérifie si on a déjà postulé à cette offre (URL normalisée)."""
     try:
+        url_norm = Memory._normaliser_url(url)
         result = _turso(
-            "SELECT 1 FROM offres_postulees WHERE url = ?",
-            [url]
+            "SELECT 1 FROM offres_postulees WHERE url = ? OR url = ?",
+            [url, url_norm]
         )
         rows = result["results"][0]["response"]["result"]["rows"]
         return len(rows) > 0
@@ -121,6 +122,24 @@ def get_urls_postulees() -> set:
     except Exception as e:
         print(f"⚠️  Turso get_urls : {e}")
         return set()
+
+
+def get_postulees_avec_details() -> list:
+    """Récupère les offres postulées avec entreprise et titre depuis Turso."""
+    try:
+        result = _turso("SELECT url, entreprise, titre FROM offres_postulees")
+        rows = result["results"][0]["response"]["result"]["rows"]
+        return [
+            {
+                "url": row[0]["value"] or "",
+                "entreprise": row[1]["value"] or "",
+                "titre": row[2]["value"] or "",
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"⚠️  Turso get_postulees_details : {e}")
+        return []
 
 
 def sync_candidatures_vers_turso():
@@ -199,29 +218,37 @@ def restaurer_statuts_depuis_turso():
     Évite de renvoyer des emails aux mêmes recruteurs.
     """
     try:
-        urls = get_urls_postulees()
-        if not urls:
+        postulees = get_postulees_avec_details()
+        if not postulees:
             print("ℹ️  Turso : aucune candidature précédente")
             return 0
 
         mem = Memory()
         with mem._connect() as conn:
-            # Marque les offres déjà en base comme postulées
-            for url in urls:
+            for o in postulees:
+                url = o["url"]
+                entreprise = o["entreprise"]
+                titre = o["titre"] or "déjà postulé"
+                # Marque les offres déjà en base comme postulées
                 conn.execute(
                     "UPDATE offres SET statut = 'postulé' WHERE url = ? AND statut != 'postulé'",
                     (url,)
                 )
-            # Insère les URLs manquantes avec statut postulé pour éviter re-scraping
-            for url in urls:
+                # Insère les URLs manquantes — avec le vrai nom d'entreprise pour bloquer les doublons
                 conn.execute("""
                     INSERT OR IGNORE INTO offres
                         (source, url, titre, entreprise, localisation, statut, score_pertinence)
-                    VALUES ('turso', ?, 'déjà postulé', '', '', 'postulé', 0.0)
-                """, (url,))
+                    VALUES ('turso', ?, ?, ?, '', 'postulé', 0.0)
+                """, (url, titre, entreprise))
+                # Met à jour l'entreprise si le stub a été créé avec une valeur vide
+                if entreprise:
+                    conn.execute(
+                        "UPDATE offres SET entreprise = ? WHERE url = ? AND (entreprise = '' OR entreprise IS NULL)",
+                        (entreprise, url)
+                    )
 
-        print(f"✅ Turso restauré : {len(urls)} candidatures précédentes chargées")
-        return len(urls)
+        print(f"✅ Turso restauré : {len(postulees)} candidatures précédentes chargées")
+        return len(postulees)
     except Exception as e:
         print(f"⚠️  Turso restaurer : {e}")
         return 0
@@ -273,6 +300,12 @@ def restaurer_tout_depuis_turso():
                     offre = conn.execute(
                         "SELECT id FROM offres WHERE url = ?", (url,)
                     ).fetchone()
+                elif entreprise:
+                    # Met à jour le stub si entreprise était vide (créé par restaurer_statuts)
+                    conn.execute(
+                        "UPDATE offres SET entreprise = ?, titre = ? WHERE url = ? AND (entreprise = '' OR entreprise IS NULL)",
+                        (entreprise, titre, url)
+                    )
 
                 if offre:
                     existing = conn.execute(
