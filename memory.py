@@ -155,7 +155,6 @@ class Memory:
                 CREATE INDEX IF NOT EXISTS idx_alumni_contacte ON alumni(contacte);
                 CREATE INDEX IF NOT EXISTS idx_candidatures_statut ON candidatures(statut);
             """)
-        print(f"✅ Base de données initialisée : {self.db_path}")
 
     # ────────────────────────────────────────────────────────────
     # OFFRES
