@@ -223,9 +223,24 @@ def scraper_alumni_hetic() -> list[dict]:
             alumnus["linkedin_url"] = url
 
             if not alumnus["prenom"]:
-                continue  # pas assez d'info
+                continue
 
-            # Filtre poste
+            # Filtre : entreprise invalide (LinkedIn = pas de vrai employeur détecté)
+            entreprise = alumnus.get("entreprise", "").lower()
+            if not entreprise or entreprise in ("linkedin", "hetic", "école hetic", ""):
+                print(f"   ⏭️  Entreprise invalide ({alumnus['entreprise']}) — skip")
+                continue
+
+            # Filtre : encore étudiant / en recherche (pas un alumni actif)
+            poste = alumnus.get("poste_actuel", "").lower()
+            mots_etudiant = ["étudiant", "student", "alternance", "apprenti", "stage",
+                             "stagiaire", "en recherche", "en cours", "bachelor", "master",
+                             "cherche", "looking for", "open to", "disponible"]
+            if any(m in poste for m in mots_etudiant):
+                print(f"   ⏭️  Encore étudiant/en recherche ({alumnus['poste_actuel']}) — skip")
+                continue
+
+            # Filtre poste pertinent (data/tech)
             if alumnus["poste_actuel"] and not poste_est_pertinent(alumnus["poste_actuel"]):
                 continue
 

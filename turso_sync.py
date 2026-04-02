@@ -79,7 +79,8 @@ def init_turso():
                 poste_actuel TEXT,
                 email TEXT,
                 statut_contact TEXT,
-                date_contact TEXT
+                date_contact TEXT,
+                linkedin_url TEXT UNIQUE
             )
         """)
         print("✅ Turso initialisé")
@@ -196,12 +197,13 @@ def sync_candidatures_vers_turso():
                 _turso("""
                     INSERT OR IGNORE INTO alumni_log
                         (prenom, nom, entreprise, poste_actuel, email,
-                         statut_contact, date_contact)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                         statut_contact, date_contact, linkedin_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
                     a["prenom"] or "", a["nom"] or "", a["entreprise"] or "",
                     a["poste_actuel"] or "", a["email"] or "",
                     a["statut_contact"] or "", a["date_contact"] or "",
+                    a["linkedin_url"] or "",
                 ])
             except Exception:
                 pass
@@ -328,7 +330,7 @@ def restaurer_tout_depuis_turso():
     try:
         result = _turso(
             "SELECT prenom, nom, entreprise, poste_actuel, email, "
-            "statut_contact, date_contact FROM alumni_log LIMIT 50"
+            "statut_contact, date_contact, linkedin_url FROM alumni_log LIMIT 50"
         )
         rows = result["results"][0]["response"]["result"]["rows"]
         nb_alumni = 0
@@ -341,12 +343,13 @@ def restaurer_tout_depuis_turso():
                 email         = row[4]["value"] or ""
                 statut        = row[5]["value"] or "mail envoyé"
                 date_contact  = row[6]["value"] or ""
+                linkedin_url  = row[7]["value"] or ""
 
                 conn.execute(
                     "INSERT OR IGNORE INTO alumni "
-                    "(prenom, nom, entreprise, poste_actuel, email, statut_contact, date_contact, contacte) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-                    (prenom, nom, entreprise, poste_actuel, email, statut, date_contact)
+                    "(prenom, nom, entreprise, poste_actuel, email, statut_contact, date_contact, contacte, linkedin_url) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                    (prenom, nom, entreprise, poste_actuel, email, statut, date_contact, linkedin_url)
                 )
                 nb_alumni += 1
         if nb_alumni:
