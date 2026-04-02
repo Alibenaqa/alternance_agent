@@ -72,11 +72,16 @@ def fetch_page(keyword: str, start: int = 0) -> str | None:
         "keywords": keyword,
         "location": "France",
         "f_TPR": "r2592000",  # 30 derniers jours
+        "f_JT": "I",           # I = Internship (apprentissage/alternance)
         "start": start,
     }
     try:
         resp = requests.get(BASE_URL, headers=HEADERS, params=params, timeout=15)
         if resp.status_code == 200:
+            content_len = len(resp.text)
+            if content_len < 500:
+                print(f"   ⚠️  Réponse trop courte ({content_len} chars) — LinkedIn bloque probablement l'IP Railway")
+                return None
             return resp.text
         print(f"   ⚠️  Status {resp.status_code} pour '{keyword}' (start={start})")
         return None
