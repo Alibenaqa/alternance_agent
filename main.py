@@ -373,6 +373,44 @@ async def cmd_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await loop.run_in_executor(None, run_cycle)
 
 
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Affiche l'état du bot et le prochain cycle."""
+    if not _check(update): return
+    mem = Memory()
+    stats = mem.get_stats()
+
+    # Prochain cycle auto
+    jobs = context.application.job_queue.get_jobs_by_name("job_cycle")
+    if jobs:
+        next_run = jobs[0].next_t
+        if next_run:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            delta = next_run - now
+            minutes = int(delta.total_seconds() // 60)
+            heures = minutes // 60
+            mins = minutes % 60
+            prochain = f"{heures}h{mins:02d}" if heures else f"{mins} min"
+        else:
+            prochain = "inconnu"
+    else:
+        prochain = "non planifié"
+
+    msg = (
+        f"🤖 <b>Status du bot</b>\n\n"
+        f"⏱ Prochain cycle auto : <b>dans {prochain}</b>\n"
+        f"🔄 Intervalle : toutes les {INTERVALLE_HEURES}h\n\n"
+        f"📊 <b>Statistiques</b>\n"
+        f"  Offres scrapées : {stats.get('total_offres', 0)}\n"
+        f"  Offres intéressantes : {stats.get('offres_interessantes', 0)}\n"
+        f"  Candidatures envoyées : {stats.get('total_candidatures', 0)}\n"
+        f"  Réponses reçues : {stats.get('reponses', 0)}\n"
+        f"  Alumni contactés : {stats.get('alumni_contactes', 0)}\n\n"
+        f"💡 /cycle pour forcer un cycle maintenant"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _check(update): return
     reply = demander_claude("Stats rapides de ma recherche.")
@@ -747,6 +785,7 @@ def main():
     app.add_handler(CommandHandler("relances",     cmd_relances))
     app.add_handler(CommandHandler("entretiens",   cmd_entretiens))
     app.add_handler(CommandHandler("help",         cmd_help))
+    app.add_handler(CommandHandler("status",       cmd_status))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
