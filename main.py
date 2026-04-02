@@ -37,7 +37,7 @@ from notifier import notifier_offres, alerter_offres_top
 from reponses import run_suivi_candidatures
 from emailer import envoyer_email
 from candidater import run_candidatures_auto, envoyer_resume_quotidien, envoyer_stats_hebdo
-from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso
+from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso, restaurer_tout_depuis_turso
 from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
 from memory import Memory
@@ -717,6 +717,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ────────────────────────────────────────────────
 
 def main():
+    # Restaure les données depuis Turso dès le démarrage (avant le dashboard)
+    try:
+        init_turso()
+        restaurer_tout_depuis_turso()
+        log.info("✅ Données Turso restaurées dans SQLite local")
+    except Exception as e:
+        log.warning(f"⚠️  Restauration Turso au démarrage : {e}")
+
     # Lance le dashboard web
     start_dashboard()
     log.info(f"🌐 Dashboard lancé sur le port {os.environ.get('PORT', 8080)}")

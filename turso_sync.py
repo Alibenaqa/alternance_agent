@@ -227,6 +227,101 @@ def restaurer_statuts_depuis_turso():
         return 0
 
 
+def restaurer_tout_depuis_turso():
+    """
+    Restaure complètement la DB locale depuis Turso au démarrage.
+    Restaure : offres postulées + candidatures + alumni.
+    Appelé immédiatement au démarrage de main.py.
+    """
+    # 1. Offres postulées (stubs anti-doublon)
+    nb_offres = restaurer_statuts_depuis_turso()
+
+    mem = Memory()
+
+    # 2. Candidatures complètes
+    try:
+        result = _turso(
+            "SELECT url, entreprise, titre, canal, email_dest, objet_email, "
+            "date_candidature, statut, nb_relances FROM candidatures_log "
+            "ORDER BY date_candidature DESC LIMIT 100"
+        )
+        rows = result["results"][0]["response"]["result"]["rows"]
+        nb_cands = 0
+        with mem._connect() as conn:
+            for row in rows:
+                url        = row[0]["value"] or ""
+                entreprise = row[1]["value"] or ""
+                titre      = row[2]["value"] or ""
+                canal      = row[3]["value"] or ""
+                email_dest = row[4]["value"] or ""
+                objet      = row[5]["value"] or ""
+                date_cand  = row[6]["value"] or ""
+                statut     = row[7]["value"] or "envoyée"
+                nb_rel     = int(row[8]["value"] or 0)
+
+                # Récupère ou crée l'offre stub
+                offre = conn.execute(
+                    "SELECT id FROM offres WHERE url = ?", (url,)
+                ).fetchone()
+                if not offre:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO offres "
+                        "(source, url, titre, entreprise, localisation, statut, score_pertinence) "
+                        "VALUES ('turso', ?, ?, ?, '', 'postulé', 0.0)",
+                        (url, titre, entreprise)
+                    )
+                    offre = conn.execute(
+                        "SELECT id FROM offres WHERE url = ?", (url,)
+                    ).fetchone()
+
+                if offre:
+                    existing = conn.execute(
+                        "SELECT id FROM candidatures WHERE offre_id = ? AND date_candidature = ?",
+                        (offre["id"], date_cand)
+                    ).fetchone()
+                    if not existing:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO candidatures "
+                            "(offre_id, canal, email_dest, objet_email, date_candidature, statut, nb_relances) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (offre["id"], canal, email_dest, objet, date_cand, statut, nb_rel)
+                        )
+                        nb_cands += 1
+        print(f"✅ Turso restauré : {nb_offres} offres, {nb_cands} candidatures")
+    except Exception as e:
+        print(f"⚠️  Turso restaurer_candidatures : {e}")
+
+    # 3. Alumni contactés
+    try:
+        result = _turso(
+            "SELECT prenom, nom, entreprise, poste_actuel, email, "
+            "statut_contact, date_contact FROM alumni_log LIMIT 50"
+        )
+        rows = result["results"][0]["response"]["result"]["rows"]
+        nb_alumni = 0
+        with mem._connect() as conn:
+            for row in rows:
+                prenom        = row[0]["value"] or ""
+                nom           = row[1]["value"] or ""
+                entreprise    = row[2]["value"] or ""
+                poste_actuel  = row[3]["value"] or ""
+                email         = row[4]["value"] or ""
+                statut        = row[5]["value"] or "mail envoyé"
+                date_contact  = row[6]["value"] or ""
+
+                conn.execute(
+                    "INSERT OR IGNORE INTO alumni "
+                    "(prenom, nom, entreprise, poste_actuel, email, statut_contact, date_contact, contacte) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+                    (prenom, nom, entreprise, poste_actuel, email, statut, date_contact)
+                )
+                nb_alumni += 1
+        if nb_alumni:
+            print(f"✅ Turso restauré : {nb_alumni} alumni")
+    except Exception as e:
+        print(f"⚠️  Turso restaurer_alumni : {e}")
+
+
 if __name__ == "__main__":
     init_turso()
     print(f"URLs postulées : {get_urls_postulees()}")
