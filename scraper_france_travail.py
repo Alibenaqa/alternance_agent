@@ -41,8 +41,8 @@ MOTS_CLES = [
 
 # Type contrat CA = Contrat d'Apprentissage (alternance)
 TYPE_CONTRAT   = "CA"
-CODE_DEPT      = "75"    # Paris (+ 92, 93, 94 pour l'IDF)
-DEPTS_IDF      = ["75", "92", "93", "94", "78", "91", "95", "77"]
+DEPTS_FRANCE   = ["75", "92", "93", "94", "78", "91", "95", "77",
+                  "69", "13", "33", "31", "59", "67", "06", "44", "35", "76"]
 RESULTATS_MAX  = 150     # max par requête selon l'API
 
 PAUSE = 2
@@ -177,7 +177,7 @@ def scraper_france_travail() -> int:
     total_nouvelles = 0
 
     for mot_cle in MOTS_CLES:
-        for dept in DEPTS_IDF:
+        for dept in DEPTS_FRANCE:
             print(f"\n🔍 France Travail : '{mot_cle}' dept {dept}...")
             data = fetch_offres(mot_cle, dept)
             if not data:

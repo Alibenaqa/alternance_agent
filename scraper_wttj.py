@@ -46,11 +46,8 @@ MOTS_CLES = [
     "Développeur Web",
 ]
 
-# Villes acceptées (None = toute la France)
-VILLES_CIBLES = {"Paris", "Boulogne-Billancourt", "Levallois-Perret",
-                  "Neuilly-sur-Seine", "Issy-les-Moulineaux", "Saint-Denis",
-                  "Courbevoie", "Puteaux", "Nanterre", "Vincennes",
-                  "Montreuil", "Pantin", "Clichy"}  # Île-de-France large
+# Mobilité France entière
+VILLES_CIBLES = None  # None = pas de filtre géographique
 
 HITS_PAR_PAGE   = 50
 PAUSE_REQUETES  = 1.5  # secondes entre chaque requête
@@ -90,14 +87,9 @@ def parser_offre(hit: dict) -> dict:
     }
 
 
-def est_en_idf(offre: dict) -> bool:
-    """Retourne True si l'offre est à Paris / IDF ou en remote."""
-    ville = offre["localisation"].lower()
-    if not ville:
-        return True  # pas de ville = potentiellement remote, on garde
-    if "paris" in ville:
-        return True
-    return offre["localisation"] in VILLES_CIBLES
+def est_en_france(offre: dict) -> bool:
+    """Retourne True — mobilité France entière acceptée."""
+    return True
 
 
 def scraper_wttj() -> int:
@@ -133,8 +125,6 @@ def scraper_wttj() -> int:
                 offre = parser_offre(hit)
 
                 # Filtre géographique
-                if not est_en_idf(offre):
-                    continue
 
                 # Dédoublonnage
                 if not offre["url"] or mem.offre_existe(offre["url"]):

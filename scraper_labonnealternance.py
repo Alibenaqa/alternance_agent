@@ -32,7 +32,7 @@ ROME_CODES = [
 # Paris (coordonnées + INSEE)
 LATITUDE  = 48.8566
 LONGITUDE = 2.3522
-RAYON_KM  = 30
+RAYON_KM  = 300
 INSEE_PARIS = "75056"
 
 PAUSE = 2  # secondes entre requêtes

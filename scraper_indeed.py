@@ -54,7 +54,7 @@ def fetch_page(keyword: str, start: int = 0) -> str | None:
     """Récupère une page de résultats Indeed."""
     params = {
         "q":       keyword,
-        "l":       "Paris, Île-de-France",
+        "l":       "France",
         "sort":    "date",
         "fromage": "30",       # 30 derniers jours
         "start":   start,

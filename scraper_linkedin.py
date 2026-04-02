@@ -52,7 +52,7 @@ def fetch_page(keyword: str, start: int = 0) -> str | None:
     """Récupère une page de résultats LinkedIn. Retourne le HTML ou None."""
     params = {
         "keywords": keyword,
-        "location": "Paris, Île-de-France, France",
+        "location": "France",
         "f_TPR": "r2592000",  # 30 derniers jours
         "start": start,
     }

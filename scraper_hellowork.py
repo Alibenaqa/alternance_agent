@@ -54,7 +54,7 @@ def fetch_page(keyword: str, page: int = 1) -> str | None:
     params = {
         "k": keyword,
         "c": "Alternance",          # filtre contrat alternance
-        "l": "Paris (75)",
+        "l": "France",
         "p": page,
     }
     try:
