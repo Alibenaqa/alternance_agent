@@ -65,6 +65,8 @@ def _get_token() -> str | None:
         return None
 
     import time as t
+    if _access_token == "FAILED":
+        return None  # auth déjà échouée ce cycle — pas de retry
     if _access_token and t.time() < _token_expires - 60:
         return _access_token
 
@@ -76,12 +78,9 @@ def _get_token() -> str | None:
                 "grant_type":    "client_credentials",
                 "client_id":     CLIENT_ID,
                 "client_secret": CLIENT_SECRET,
-                "scope":         (
-                    "api_offresdemploiv2 "
-                    "application_offresdemploiv2 "
-                    "o2dsoffre"
-                ),
+                "scope":         "api_offresdemploiv2",
             },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=10,
         )
         resp.raise_for_status()
@@ -91,6 +90,7 @@ def _get_token() -> str | None:
         return _access_token
     except Exception as e:
         print(f"   ❌ France Travail auth : {e}")
+        _access_token = "FAILED"  # stoppe les retries du cycle
         return None
 
 
