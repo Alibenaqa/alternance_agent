@@ -399,7 +399,14 @@ def _launch_browser(playwright):
 
 
 def _est_connecte(page) -> bool:
-    return any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav[aria-label]").count() > 0
+    url = page.url
+    # Vérifie que l'URL est bien le feed/réseau (pas juste un redirect param)
+    domaine_ok = (
+        url.startswith("https://www.linkedin.com/feed")
+        or url.startswith("https://www.linkedin.com/mynetwork")
+        or url.startswith("https://www.linkedin.com/jobs")
+    )
+    return domaine_ok or page.locator("nav[aria-label]").count() > 0
 
 
 def _est_verification(page) -> bool:
