@@ -391,6 +391,15 @@ async def cmd_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await loop.run_in_executor(None, run_cycle)
 
 
+async def cmd_linkedin_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Force une session LinkedIn maintenant (test)."""
+    if not _check(update): return
+    await update.message.reply_text("🌐 Session LinkedIn lancée, je te notifie quand c'est fini...")
+    import asyncio
+    app = context.application
+    await asyncio.get_event_loop().run_in_executor(None, lambda: run_linkedin_session(app))
+
+
 async def cmd_linkedin_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Génère et propose un post LinkedIn depuis Telegram. Usage: /linkedin_post <sujet>"""
     if not _check(update): return
@@ -900,7 +909,8 @@ def main():
     app.add_handler(CommandHandler("entretiens",   cmd_entretiens))
     app.add_handler(CommandHandler("help",           cmd_help))
     app.add_handler(CommandHandler("status",         cmd_status))
-    app.add_handler(CommandHandler("linkedin_post",  cmd_linkedin_post))
+    app.add_handler(CommandHandler("linkedin_post",    cmd_linkedin_post))
+    app.add_handler(CommandHandler("linkedin_session", cmd_linkedin_session))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
