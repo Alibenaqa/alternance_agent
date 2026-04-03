@@ -61,6 +61,34 @@ RECHERCHES_CONNEXION = [
 NOTE_MAX_CHARS = 300  # LinkedIn limite les notes de connexion
 
 # ─────────────────────────────────────────────────────
+# VERIFICATION CODE (LinkedIn 2FA)
+# ─────────────────────────────────────────────────────
+
+_verification_code: str | None = None
+
+def set_linkedin_code(code: str):
+    global _verification_code
+    _verification_code = code
+
+def _attendre_code_verification(timeout: int = 300) -> str | None:
+    """Attend que l'utilisateur envoie /linkedin_code via Telegram (max 5 min)."""
+    global _verification_code
+    _verification_code = None
+    _telegram(
+        "🔐 <b>LinkedIn demande un code de vérification</b>\n"
+        "Vérifie ton email et envoie :\n"
+        "<code>/linkedin_code XXXXXX</code>"
+    )
+    start = time.time()
+    while time.time() - start < timeout:
+        if _verification_code:
+            code = _verification_code
+            _verification_code = None
+            return code
+        time.sleep(2)
+    return None
+
+# ─────────────────────────────────────────────────────
 # TELEGRAM
 # ─────────────────────────────────────────────────────
 
@@ -326,28 +354,12 @@ def _pause_humaine():
     time.sleep(random.uniform(3, 8))
 
 
-def _get_chromium_path() -> str | None:
-    """Trouve le chemin du Chromium système (Railway/nix) ou retourne None."""
-    import shutil
-    for candidate in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
-        path = shutil.which(candidate)
-        if path:
-            return path
-    return None
-
-
 def _launch_browser(playwright):
-    chromium_path = _get_chromium_path()
-    launch_kwargs = {
-        "headless": True,
-        "args": ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
-                 "--no-zygote", "--disable-setuid-sandbox"],
-    }
-    if chromium_path:
-        print(f"   🌐 Chromium système : {chromium_path}")
-        launch_kwargs["executable_path"] = chromium_path
-
-    browser = playwright.chromium.launch(**launch_kwargs)
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+              "--no-zygote", "--disable-setuid-sandbox"],
+    )
     ctx = browser.new_context(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -373,10 +385,28 @@ def _login(page) -> bool:
 
         if any(x in page.url for x in ["feed", "mynetwork", "jobs"]):
             return True
-        if "checkpoint" in page.url or "challenge" in page.url:
-            print("   ⚠️  LinkedIn demande une vérification de sécurité")
-            _telegram("⚠️ <b>LinkedIn</b> : vérification de sécurité requise — connexion impossible automatiquement")
-            return False
+        if "checkpoint" in page.url or "challenge" in page.url or "verification" in page.url:
+            print("   ⚠️  LinkedIn demande un code de vérification")
+            code = _attendre_code_verification(timeout=300)
+            if not code:
+                _telegram("⏱️ <b>LinkedIn</b> : délai expiré, code non reçu — session annulée")
+                return False
+            # Cherche le champ de code et le soumet
+            try:
+                inp = page.locator("input[name='pin'], input[id*='pin'], input[type='text']").first
+                inp.fill(code)
+                _pause(0.5, 1)
+                page.locator("button[type='submit'], button:has-text('Submit'), button:has-text('Vérifier')").first.click()
+                page.wait_for_load_state("networkidle", timeout=15000)
+                _pause(2, 3)
+                if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
+                    _telegram("✅ <b>LinkedIn</b> : code accepté, connexion réussie !")
+                    return True
+                _telegram("❌ <b>LinkedIn</b> : code refusé ou page inattendue")
+                return False
+            except Exception as e:
+                _telegram(f"❌ <b>LinkedIn</b> : erreur lors de la saisie du code : {str(e)[:100]}")
+                return False
         if page.locator("nav").count() > 0:
             return True
 

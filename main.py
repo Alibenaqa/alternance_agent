@@ -42,7 +42,8 @@ from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
 from linkedin_agent import (run_linkedin_session, generer_post_linkedin, get_commentaires_pending,
                             publier_post, poster_commentaire_approuve, get_messages_pending,
-                            envoyer_reponse_message, get_dms_pending, envoyer_dm_approuve)
+                            envoyer_reponse_message, get_dms_pending, envoyer_dm_approuve,
+                            set_linkedin_code)
 from memory import Memory
 from dashboard import start_dashboard
 
@@ -403,6 +404,17 @@ async def cmd_linkedin_session(update: Update, context: ContextTypes.DEFAULT_TYP
         await asyncio.get_event_loop().run_in_executor(None, lambda: run_linkedin_session(app))
     except Exception as e:
         await update.message.reply_text(f"❌ Erreur session LinkedIn : {str(e)[:300]}")
+
+
+async def cmd_linkedin_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Transmet le code de vérification LinkedIn. Usage: /linkedin_code 738257"""
+    if not _check(update): return
+    if not context.args:
+        await update.message.reply_text("Usage : /linkedin_code 738257")
+        return
+    code = context.args[0].strip()
+    set_linkedin_code(code)
+    await update.message.reply_text(f"✅ Code <code>{code}</code> transmis à LinkedIn.", parse_mode="HTML")
 
 
 async def cmd_linkedin_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -976,6 +988,7 @@ def main():
     app.add_handler(CommandHandler("status",         cmd_status))
     app.add_handler(CommandHandler("linkedin_post",    cmd_linkedin_post))
     app.add_handler(CommandHandler("linkedin_session", cmd_linkedin_session))
+    app.add_handler(CommandHandler("linkedin_code",    cmd_linkedin_code))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
