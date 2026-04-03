@@ -456,12 +456,28 @@ def _login(page) -> bool:
             # Page "Welcome Back" — clic sur le compte
             if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0:
                 print("   ⚠️  Page Welcome Back — clic sur le compte")
-                _telegram_screenshot(page, "⚠️ Page Welcome Back")
-                btn = page.locator("div[class*='account-list-item'], li[class*='account']").first
-                if not btn.count():
-                    btn = page.locator(f"text={LINKEDIN_EMAIL[:10]}").first
-                if btn.count():
-                    btn.click()
+                _telegram_screenshot(page, "⚠️ Page Welcome Back — tentative de clic")
+                # Clic sur le premier compte listé (Mohamed Ali Benaqa)
+                clicked = False
+                for sel in [
+                    "div[class*='sign-in-form'] li:first-child",
+                    "li:has(img[alt])",
+                    "div[class*='profile-listing']",
+                    f"text={LINKEDIN_EMAIL}",
+                ]:
+                    try:
+                        el = page.locator(sel).first
+                        if el.count() and el.is_visible():
+                            el.click()
+                            page.wait_for_load_state("networkidle", timeout=15000)
+                            _pause(2, 3)
+                            clicked = True
+                            break
+                    except Exception:
+                        continue
+                if not clicked:
+                    # Fallback : clic direct sur la zone avec le nom
+                    page.get_by_text("Mohamed Ali").click()
                     page.wait_for_load_state("networkidle", timeout=15000)
                     _pause(2, 3)
 
