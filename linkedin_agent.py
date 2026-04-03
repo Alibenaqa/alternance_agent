@@ -381,24 +381,12 @@ def _pause_humaine():
     time.sleep(random.uniform(3, 8))
 
 
-SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "")
-
-
 def _launch_browser(playwright):
-    launch_kwargs = dict(
+    browser = playwright.chromium.launch(
         headless=True,
         args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
               "--no-zygote", "--disable-setuid-sandbox"],
     )
-    # ScraperAPI proxy pour contourner le blocage IP de Railway
-    if SCRAPERAPI_KEY:
-        launch_kwargs["proxy"] = {
-            "server": "http://proxy-server.scraperapi.com:8001",
-            "username": "scraperapi",
-            "password": SCRAPERAPI_KEY,
-        }
-
-    browser = playwright.chromium.launch(**launch_kwargs)
     ctx = browser.new_context(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -406,7 +394,6 @@ def _launch_browser(playwright):
             "Chrome/122.0.0.0 Safari/537.36"
         ),
         viewport={"width": 1280, "height": 800},
-        ignore_https_errors=True,
     )
     return browser, ctx
 
@@ -456,9 +443,27 @@ def _soumettre_code(page) -> bool:
 
 def _login(page) -> bool:
     try:
-        from turso_sync import sauvegarder_cookies_linkedin
+        from turso_sync import charger_cookies_linkedin, sauvegarder_cookies_linkedin
 
-        # Login direct email/password
+        # Essai avec les cookies du vrai Chrome
+        cookies = charger_cookies_linkedin()
+        if cookies:
+            page.context.add_cookies(cookies)
+            page.goto("https://www.linkedin.com/feed", timeout=30000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
+            _pause(2, 3)
+            _telegram_screenshot(page, f"🍪 Test cookies — {page.url[:80]}")
+            if _est_connecte(page):
+                print("   ✅ LinkedIn connecté via cookies Chrome")
+                return True
+            if _est_verification(page):
+                return _soumettre_code(page)
+            print("   ⚠️  Cookies expirés ou invalides")
+
+        # Fallback login email/password
         page.goto("https://www.linkedin.com/login", timeout=30000)
         try:
             page.wait_for_load_state("networkidle", timeout=10000)
