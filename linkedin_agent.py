@@ -436,11 +436,27 @@ def _soumettre_code(page) -> bool:
         _telegram("⏱️ <b>LinkedIn</b> : délai expiré — session annulée. Renvoie /linkedin_session et envoie vite le code.")
         return False
     try:
-        # Sélecteurs pour le champ "Enter code"
-        inp = page.locator(
+        _telegram_screenshot(page, f"🔍 État page après réception code ({page.url[:80]})")
+        # Si la page a expiré / redirigé, on ne peut plus saisir le code
+        if _est_connecte(page):
+            sauvegarder_cookies_linkedin(page.context.cookies())
+            _telegram("✅ Déjà connecté — code non nécessaire.")
+            return True
+
+        # Attendre que le champ soit présent (max 15s)
+        SELECTORINPUT = (
+            "input[placeholder*='Enter code'], input[placeholder*='enter code'], "
             "input[placeholder*='code'], input[placeholder*='Code'], "
-            "input[name='pin'], input[id*='pin'], input[type='text']"
-        ).first
+            "input[name='pin'], input[id*='pin'], input[autocomplete='one-time-code'], "
+            "input[type='text']"
+        )
+        try:
+            page.wait_for_selector(SELECTORINPUT, timeout=15000)
+        except Exception:
+            _telegram_screenshot(page, f"❌ Champ code introuvable — URL: {page.url[:80]}")
+            return False
+
+        inp = page.locator(SELECTORINPUT).first
         inp.fill(code)
         _pause(0.5, 1)
         page.locator("button[type='submit'], button:has-text('Submit'), button:has-text('Vérifier'), button:has-text('Verify')").first.click()
