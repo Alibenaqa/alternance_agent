@@ -526,7 +526,8 @@ def _login(page) -> bool:
             else:
                 print("   ⚠️  Cookies expirés ou invalides")
 
-        # Fallback login email/password
+        # Fallback login email/password — vider les cookies pour forcer la vraie page /login
+        page.context.clear_cookies()
         page.goto("https://www.linkedin.com/login", timeout=30000)
         try:
             page.wait_for_load_state("networkidle", timeout=10000)
