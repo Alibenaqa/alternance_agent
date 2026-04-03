@@ -516,27 +516,15 @@ def _login(page) -> bool:
                     pass
                 _pause(2, 3)
 
-            # Page "Welcome back" avec champ Password
+            # Page "Welcome back" avec champ Password → LinkedIn bloque cette soumission
+            # On abandonne les cookies et on fait un login propre depuis /login
             pwd_field = page.locator("input[type='password'], input[name='password'], input[placeholder*='assword']").first
             if pwd_field.count() and pwd_field.is_visible():
-                print("   ⚠️  Champ mot de passe détecté — saisie automatique")
-                pwd_field.click()
-                _pause(0.3, 0.7)
-                pwd_field.type(LINKEDIN_PASSWORD, delay=random.randint(60, 130))
-                _pause(0.5, 1)
-                page.locator("button:has-text('Sign in'), button[type='submit']").first.click()
-                try:
-                    page.wait_for_load_state("networkidle", timeout=15000)
-                except Exception:
-                    pass
-                _pause(3, 5)
-                _telegram_screenshot(page, f"🔍 Après mot de passe — {page.url[:80]}")
-                if _est_connecte(page):
-                    sauvegarder_cookies_linkedin(page.context.cookies())
-                    return True
-                if _est_verification(page):
-                    return _soumettre_code(page)
-            print("   ⚠️  Cookies expirés ou invalides")
+                print("   ⚠️  Welcome Back détecté — login propre depuis /login")
+                _telegram("⚠️ Cookies expirés, passage au login email/password...")
+                # Tombe dans le fallback ci-dessous
+            else:
+                print("   ⚠️  Cookies expirés ou invalides")
 
         # Fallback login email/password
         page.goto("https://www.linkedin.com/login", timeout=30000)
