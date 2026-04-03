@@ -443,75 +443,46 @@ def _soumettre_code(page) -> bool:
 
 def _login(page) -> bool:
     try:
-        from turso_sync import charger_cookies_linkedin, sauvegarder_cookies_linkedin
+        from turso_sync import sauvegarder_cookies_linkedin
 
-        # Essai avec les cookies sauvegardés
-        cookies = charger_cookies_linkedin()
-        if cookies:
-            page.context.add_cookies(cookies)
-            page.goto("https://www.linkedin.com/feed", timeout=20000)
-            page.wait_for_load_state("networkidle", timeout=10000)
-            _pause(2, 3)
-
-            # Page "Welcome Back" — clic sur le compte
-            if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0:
-                print("   ⚠️  Page Welcome Back — clic sur le compte")
-                _telegram_screenshot(page, "⚠️ Page Welcome Back — tentative de clic")
-                # Clic sur le premier compte listé (Mohamed Ali Benaqa)
-                clicked = False
-                for sel in [
-                    "div[class*='sign-in-form'] li:first-child",
-                    "li:has(img[alt])",
-                    "div[class*='profile-listing']",
-                    f"text={LINKEDIN_EMAIL}",
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if el.count() and el.is_visible():
-                            el.click()
-                            page.wait_for_load_state("networkidle", timeout=15000)
-                            _pause(2, 3)
-                            clicked = True
-                            break
-                    except Exception:
-                        continue
-                if not clicked:
-                    # Fallback : clic direct sur la zone avec le nom
-                    page.get_by_text("Mohamed Ali").click()
-                    page.wait_for_load_state("networkidle", timeout=15000)
-                    _pause(2, 3)
-
-            if _est_verification(page):
-                return _soumettre_code(page)
-
-            if _est_connecte(page):
-                print("   ✅ LinkedIn connecté via cookies")
-                _telegram_screenshot(page, f"✅ Connecté via cookies")
-                return True
-            print("   ⚠️  Cookies expirés, reconnexion par email/password")
-
+        # Login direct email/password
         page.goto("https://www.linkedin.com/login", timeout=20000)
-        _pause(2, 4)
+        page.wait_for_load_state("networkidle", timeout=10000)
+        _pause(2, 3)
+
         page.fill("#username", LINKEDIN_EMAIL)
         _pause(0.5, 1.5)
         page.fill("#password", LINKEDIN_PASSWORD)
         _pause(0.5, 1.5)
         page.click("button[type='submit']")
         page.wait_for_load_state("networkidle", timeout=15000)
-        _pause(2, 4)
+        _pause(3, 5)
+
+        # Screenshot systématique pour voir où on en est
+        _telegram_screenshot(page, f"🔍 Après login — {page.url[:80]}")
 
         if _est_connecte(page):
             sauvegarder_cookies_linkedin(page.context.cookies())
+            print("   ✅ LinkedIn connecté")
             return True
 
         if _est_verification(page):
             return _soumettre_code(page)
 
-        if page.locator("nav").count() > 0:
-            return True
+        # Cas Welcome Back (sélecteur de compte)
+        if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0:
+            print("   ⚠️  Page Welcome Back")
+            page.get_by_text("Mohamed Ali").first.click()
+            page.wait_for_load_state("networkidle", timeout=15000)
+            _pause(2, 3)
+            _telegram_screenshot(page, f"🔍 Après clic compte — {page.url[:80]}")
+            if _est_connecte(page):
+                sauvegarder_cookies_linkedin(page.context.cookies())
+                return True
+            if _est_verification(page):
+                return _soumettre_code(page)
 
-        print(f"   ⚠️  URL après login : {page.url}")
-        _telegram_screenshot(page, f"⚠️ Page inattendue après login")
+        print(f"   ⚠️  URL inattendue : {page.url}")
         return False
     except Exception as e:
         print(f"   ❌ Erreur login : {e}")
