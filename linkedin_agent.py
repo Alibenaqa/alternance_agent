@@ -501,28 +501,35 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
     try:
         url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&network=%5B%22S%22%2C%22O%22%5D"
         page.goto(url, timeout=20000)
+        page.wait_for_load_state("networkidle", timeout=10000)
         _pause_humaine()
 
-        cards = page.locator("li.reusable-search__result-container").all()
-        random.shuffle(cards)  # ordre aléatoire
+        # Sélecteurs modernes LinkedIn 2024-2026
+        cards = page.locator("li[class*='result-container'], li[class*='search-result']").all()
+        if not cards:
+            cards = page.locator("div[class*='entity-result']").all()
+        random.shuffle(cards)
 
         for card in cards[:max_profils * 2]:
             try:
-                nom_el = card.locator("span.entity-result__title-text a span[aria-hidden='true']").first
-                poste_el = card.locator("div.entity-result__primary-subtitle").first
-                entreprise_el = card.locator("div.entity-result__secondary-subtitle").first
-                lien_el = card.locator("a.app-aware-link").first
-
+                # Nom : aria-hidden spans dans les liens de profil
+                nom_el = card.locator("span[aria-hidden='true']").first
                 nom = nom_el.inner_text().strip() if nom_el.count() else ""
-                poste = poste_el.inner_text().strip() if poste_el.count() else ""
-                entreprise = entreprise_el.inner_text().strip() if entreprise_el.count() else ""
+
+                # Lien profil
+                lien_el = card.locator("a[href*='/in/']").first
                 lien = lien_el.get_attribute("href") if lien_el.count() else ""
+
+                # Poste et entreprise : les subtitles
+                subtitles = card.locator("div[class*='subtitle'], div[class*='primary-subtitle'], div[class*='secondary-subtitle']").all()
+                poste = subtitles[0].inner_text().strip() if len(subtitles) > 0 else ""
+                entreprise = subtitles[1].inner_text().strip() if len(subtitles) > 1 else ""
 
                 if not nom or not lien:
                     continue
 
-                # Filtre : déjà connecté ?
-                if card.locator("span:has-text('1er'), span:has-text('1st')").count() > 0:
+                # Filtre : déjà connecté 1er degré
+                if card.locator("span:has-text('1er'), span:has-text('1st'), span:has-text('• 1st')").count() > 0:
                     continue
 
                 profils.append({
@@ -605,33 +612,42 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     posts = []
     try:
         page.goto("https://www.linkedin.com/feed/", timeout=20000)
+        page.wait_for_load_state("networkidle", timeout=10000)
         _pause_humaine()
 
         # Scroll pour charger plus de posts
-        for _ in range(3):
+        for _ in range(4):
             page.evaluate("window.scrollBy(0, 800)")
-            _pause(1.5, 3)
+            _pause(1.5, 2.5)
 
-        articles = page.locator("div.feed-shared-update-v2").all()
-        for article in articles[:max_posts]:
+        # Sélecteurs modernes LinkedIn 2024-2026
+        articles = page.locator("div[data-urn*='activity'], div[class*='feed-shared-update']").all()
+        if not articles:
+            articles = page.locator("div[class*='occludable-update']").all()
+
+        for article in articles[:max_posts * 2]:
             try:
-                # Auteur
-                auteur_el = article.locator("span.feed-shared-actor__name").first
+                # Auteur : premier lien /in/ dans l'article
+                auteur_el = article.locator("a[href*='/in/'] span[aria-hidden='true']").first
+                if not auteur_el.count():
+                    auteur_el = article.locator("span[class*='actor__name']").first
                 auteur = auteur_el.inner_text().strip() if auteur_el.count() else "Inconnu"
 
-                # Poste auteur
-                titre_el = article.locator("span.feed-shared-actor__description").first
+                # Titre auteur
+                titre_el = article.locator("span[class*='actor__description'], span[class*='subtitle']").first
                 titre_auteur = titre_el.inner_text().strip() if titre_el.count() else ""
 
-                # Contenu du post
-                contenu_el = article.locator("div.feed-shared-text").first
+                # Contenu : cherche le texte principal
+                contenu_el = article.locator("div[class*='commentary'] span[dir='ltr'], div[class*='update-components-text'] span[dir='ltr'], div[class*='feed-shared-text']").first
+                if not contenu_el.count():
+                    contenu_el = article.locator("span[dir='ltr']").first
                 contenu = contenu_el.inner_text().strip() if contenu_el.count() else ""
 
                 if not contenu or len(contenu) < 50:
                     continue
 
                 # URL du post
-                lien_el = article.locator("a.app-aware-link[href*='/posts/']").first
+                lien_el = article.locator("a[href*='/posts/'], a[href*='/feed/update/']").first
                 url_post = lien_el.get_attribute("href") if lien_el.count() else ""
 
                 posts.append({
@@ -640,6 +656,9 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
                     "contenu": contenu,
                     "url": url_post,
                 })
+
+                if len(posts) >= max_posts:
+                    break
             except Exception:
                 continue
 
@@ -758,7 +777,9 @@ def run_likes(page, nb_likes: int) -> int:
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
-        articles = page.locator("div.feed-shared-update-v2").all()
+        articles = page.locator("div[data-urn*='activity'], div[class*='feed-shared-update'], div[class*='occludable-update']").all()
+        if not articles:
+            articles = page.locator("div[class*='fie-impression-container']").all()
         random.shuffle(articles)
         likes = 0
 
@@ -766,7 +787,7 @@ def run_likes(page, nb_likes: int) -> int:
             if likes >= nb_likes:
                 break
             try:
-                contenu_el = article.locator("div.feed-shared-text").first
+                contenu_el = article.locator("div[class*='commentary'] span[dir='ltr'], span[dir='ltr']").first
                 contenu = contenu_el.inner_text().strip() if contenu_el.count() else ""
 
                 if not contenu or not _evaluer_post(contenu):
@@ -774,7 +795,7 @@ def run_likes(page, nb_likes: int) -> int:
 
                 # Cherche le bouton Like (pas déjà liké)
                 btn_like = article.locator(
-                    "button[aria-label*='Like'], button[aria-label*='J\\'aime']"
+                    "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], button[aria-label*='like']"
                 ).first
                 if not btn_like.is_visible():
                     continue
