@@ -393,8 +393,11 @@ def _pause_humaine():
 def _launch_browser(playwright):
     browser = playwright.chromium.launch(
         headless=True,
-        args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
-              "--no-zygote", "--disable-setuid-sandbox"],
+        args=[
+            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+            "--no-zygote", "--disable-setuid-sandbox",
+            "--disable-blink-features=AutomationControlled",
+        ],
     )
     ctx = browser.new_context(
         user_agent=(
@@ -403,7 +406,16 @@ def _launch_browser(playwright):
             "Chrome/122.0.0.0 Safari/537.36"
         ),
         viewport={"width": 1280, "height": 800},
+        locale="fr-FR",
+        timezone_id="Europe/Paris",
+        extra_http_headers={"Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"},
     )
+    # Masque navigator.webdriver pour éviter la détection bot
+    ctx.add_init_script("""
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+        window.chrome = { runtime: {} };
+    """)
     return browser, ctx
 
 
@@ -508,7 +520,9 @@ def _login(page) -> bool:
             pwd_field = page.locator("input[type='password'], input[name='password'], input[placeholder*='assword']").first
             if pwd_field.count() and pwd_field.is_visible():
                 print("   ⚠️  Champ mot de passe détecté — saisie automatique")
-                pwd_field.fill(LINKEDIN_PASSWORD)
+                pwd_field.click()
+                _pause(0.3, 0.7)
+                pwd_field.type(LINKEDIN_PASSWORD, delay=random.randint(60, 130))
                 _pause(0.5, 1)
                 page.locator("button:has-text('Sign in'), button[type='submit']").first.click()
                 try:
@@ -532,9 +546,11 @@ def _login(page) -> bool:
             pass
         _pause(2, 3)
 
-        page.fill("#username", LINKEDIN_EMAIL)
+        page.click("#username")
+        page.type("#username", LINKEDIN_EMAIL, delay=random.randint(50, 110))
         _pause(0.5, 1.5)
-        page.fill("#password", LINKEDIN_PASSWORD)
+        page.click("#password")
+        page.type("#password", LINKEDIN_PASSWORD, delay=random.randint(60, 130))
         _pause(0.5, 1.5)
         page.click("button[type='submit']")
         try:
