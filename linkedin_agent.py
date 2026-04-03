@@ -398,6 +398,49 @@ def _launch_browser(playwright):
     return browser, ctx
 
 
+def _est_connecte(page) -> bool:
+    return any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav[aria-label]").count() > 0
+
+
+def _est_verification(page) -> bool:
+    return (
+        "checkpoint" in page.url or "challenge" in page.url
+        or "verification" in page.url or "security" in page.url
+        or page.locator("input[placeholder*='code'], input[placeholder*='Code']").count() > 0
+        or page.locator("text=quick verification, text=Let's do a quick").count() > 0
+    )
+
+
+def _soumettre_code(page) -> bool:
+    """Attend le code de l'utilisateur via Telegram et le soumet."""
+    from turso_sync import sauvegarder_cookies_linkedin
+    _telegram_screenshot(page, "🔐 LinkedIn demande un code de vérification")
+    code = _attendre_code_verification(timeout=300)
+    if not code:
+        _telegram("⏱️ <b>LinkedIn</b> : délai expiré — session annulée. Renvoie /linkedin_session et envoie vite le code.")
+        return False
+    try:
+        # Sélecteurs pour le champ "Enter code"
+        inp = page.locator(
+            "input[placeholder*='code'], input[placeholder*='Code'], "
+            "input[name='pin'], input[id*='pin'], input[type='text']"
+        ).first
+        inp.fill(code)
+        _pause(0.5, 1)
+        page.locator("button[type='submit'], button:has-text('Submit'), button:has-text('Vérifier'), button:has-text('Verify')").first.click()
+        page.wait_for_load_state("networkidle", timeout=15000)
+        _pause(2, 3)
+        if _est_connecte(page):
+            sauvegarder_cookies_linkedin(page.context.cookies())
+            _telegram_screenshot(page, "✅ Code accepté — connecté à LinkedIn !")
+            return True
+        _telegram_screenshot(page, "❌ Code refusé ou page inattendue")
+        return False
+    except Exception as e:
+        _telegram(f"❌ Erreur saisie code : {str(e)[:100]}")
+        return False
+
+
 def _login(page) -> bool:
     try:
         from turso_sync import charger_cookies_linkedin, sauvegarder_cookies_linkedin
@@ -407,21 +450,27 @@ def _login(page) -> bool:
         if cookies:
             page.context.add_cookies(cookies)
             page.goto("https://www.linkedin.com/feed", timeout=20000)
+            page.wait_for_load_state("networkidle", timeout=10000)
             _pause(2, 3)
-            # Gère la page "Welcome Back" (sélecteur de compte)
-            if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0 or page.locator("text=Bon retour").count() > 0:
+
+            # Page "Welcome Back" — clic sur le compte
+            if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0:
                 print("   ⚠️  Page Welcome Back — clic sur le compte")
-                btn_compte = page.locator("div[class*='account-list'] li, div[data-test*='account'], li[class*='account']").first
-                if not btn_compte.count():
-                    btn_compte = page.locator(f"text={LINKEDIN_EMAIL[:6]}").first
-                if btn_compte.count():
-                    btn_compte.click()
+                _telegram_screenshot(page, "⚠️ Page Welcome Back")
+                btn = page.locator("div[class*='account-list-item'], li[class*='account']").first
+                if not btn.count():
+                    btn = page.locator(f"text={LINKEDIN_EMAIL[:10]}").first
+                if btn.count():
+                    btn.click()
                     page.wait_for_load_state("networkidle", timeout=15000)
                     _pause(2, 3)
 
-            if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
+            if _est_verification(page):
+                return _soumettre_code(page)
+
+            if _est_connecte(page):
                 print("   ✅ LinkedIn connecté via cookies")
-                _telegram_screenshot(page, f"✅ Connecté via cookies — {page.url[:80]}")
+                _telegram_screenshot(page, f"✅ Connecté via cookies")
                 return True
             print("   ⚠️  Cookies expirés, reconnexion par email/password")
 
@@ -435,36 +484,18 @@ def _login(page) -> bool:
         page.wait_for_load_state("networkidle", timeout=15000)
         _pause(2, 4)
 
-        if any(x in page.url for x in ["feed", "mynetwork", "jobs"]):
+        if _est_connecte(page):
             sauvegarder_cookies_linkedin(page.context.cookies())
             return True
-        if "checkpoint" in page.url or "challenge" in page.url or "verification" in page.url:
-            print("   ⚠️  LinkedIn demande un code de vérification")
-            code = _attendre_code_verification(timeout=300)
-            if not code:
-                _telegram("⏱️ <b>LinkedIn</b> : délai expiré, code non reçu — session annulée")
-                return False
-            # Cherche le champ de code et le soumet
-            try:
-                inp = page.locator("input[name='pin'], input[id*='pin'], input[type='text']").first
-                inp.fill(code)
-                _pause(0.5, 1)
-                page.locator("button[type='submit'], button:has-text('Submit'), button:has-text('Vérifier')").first.click()
-                page.wait_for_load_state("networkidle", timeout=15000)
-                _pause(2, 3)
-                if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
-                    sauvegarder_cookies_linkedin(page.context.cookies())
-                    _telegram("✅ <b>LinkedIn</b> : code accepté, connexion réussie !")
-                    return True
-                _telegram("❌ <b>LinkedIn</b> : code refusé ou page inattendue")
-                return False
-            except Exception as e:
-                _telegram(f"❌ <b>LinkedIn</b> : erreur lors de la saisie du code : {str(e)[:100]}")
-                return False
+
+        if _est_verification(page):
+            return _soumettre_code(page)
+
         if page.locator("nav").count() > 0:
             return True
 
         print(f"   ⚠️  URL après login : {page.url}")
+        _telegram_screenshot(page, f"⚠️ Page inattendue après login")
         return False
     except Exception as e:
         print(f"   ❌ Erreur login : {e}")
