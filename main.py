@@ -399,7 +399,10 @@ async def cmd_linkedin_session(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text("🌐 Session LinkedIn lancée, je te notifie quand c'est fini...")
     import asyncio
     app = context.application
-    await asyncio.get_event_loop().run_in_executor(None, lambda: run_linkedin_session(app))
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, lambda: run_linkedin_session(app))
+    except Exception as e:
+        await update.message.reply_text(f"❌ Erreur session LinkedIn : {str(e)[:300]}")
 
 
 async def cmd_linkedin_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
