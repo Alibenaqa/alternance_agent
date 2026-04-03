@@ -4,8 +4,5 @@ nixPkgs = ["nss", "nspr", "atk", "cups", "dbus", "expat", "libdrm", "libxkbcommo
 [phases.build]
 cmds = ["pip install -r requirements.txt", "PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright playwright install chromium"]
 
-[variables]
-PLAYWRIGHT_BROWSERS_PATH = "/app/ms-playwright"
-
 [start]
 cmd = "python main.py"
