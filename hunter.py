@@ -10,15 +10,20 @@ BASE_URL = "https://api.hunter.io/v2"
 
 
 def _domain_search(domaine: str) -> dict | None:
-    """Appelle Hunter domain-search pour un domaine. Retourne le meilleur email ou None."""
+    """
+    Appelle Hunter domain-search pour un domaine.
+    Retourne UNIQUEMENT un email RH/recrutement confirmé, ou None.
+    Ne renvoie jamais un email non-RH pour éviter d'écrire au mauvais interlocuteur.
+    """
     try:
         resp = requests.get(
             f"{BASE_URL}/domain-search",
             params={
                 "domain": domaine,
                 "api_key": HUNTER_API_KEY,
-                "limit": 10,
+                "limit": 20,  # plus large pour maximiser les chances de trouver un RH
                 "type": "personal",
+                "department": "human resources",  # filtre département côté API
             },
             timeout=10,
         )
@@ -27,25 +32,50 @@ def _domain_search(domaine: str) -> dict | None:
         if not emails:
             return None
 
-        mots_rh = ["rh", "hr", "recrutement", "recruitment", "talent", "people", "careers", "emploi", "jobs"]
+        # Mots qui confirment que c'est un profil RH/recrutement
+        mots_rh_forts = ["rh", "hr", "recrutement", "recruitment", "talent", "people", "drh", "chro"]
+        mots_rh_larges = ["careers", "emploi", "jobs", "hiring", "staffing", "people ops"]
+        # Mots qui disent clairement que c'est PAS RH → on rejette
+        mots_exclus = ["ceo", "cto", "coo", "cfo", "directeur", "director", "president",
+                       "commercial", "sales", "marketing", "finance", "comptable", "juridique",
+                       "legal", "communication", "it ", "dev", "engineer", "data", "tech"]
+
+        candidats_rh = []
         for email_info in emails:
-            nom_dep = (email_info.get("department") or "").lower()
+            nom_dep  = (email_info.get("department") or "").lower()
             position = (email_info.get("position") or "").lower()
-            adresse = (email_info.get("value") or "").lower()
-            if any(m in nom_dep or m in position or m in adresse for m in mots_rh):
-                return {
+            adresse  = (email_info.get("value") or "").lower()
+            texte    = f"{nom_dep} {position} {adresse}"
+
+            # Exclure les non-RH évidents
+            if any(m in texte for m in mots_exclus):
+                continue
+
+            # Score RH : plus le mot est fort, plus on priorise
+            score_rh = 0
+            if any(m in texte for m in mots_rh_forts):
+                score_rh = 2
+            elif any(m in texte for m in mots_rh_larges):
+                score_rh = 1
+
+            if score_rh > 0:
+                candidats_rh.append({
                     "email": email_info["value"],
                     "nom": f"{email_info.get('first_name', '')} {email_info.get('last_name', '')}".strip(),
                     "confiance": email_info.get("confidence", 0),
                     "domaine": domaine,
-                }
-        meilleur = max(emails, key=lambda e: e.get("confidence", 0))
-        return {
-            "email": meilleur["value"],
-            "nom": f"{meilleur.get('first_name', '')} {meilleur.get('last_name', '')}".strip(),
-            "confiance": meilleur.get("confidence", 0),
-            "domaine": domaine,
-        }
+                    "_score_rh": score_rh,
+                })
+
+        if not candidats_rh:
+            return None  # Pas de RH trouvé → on ne renvoie rien (mieux que le mauvais destinataire)
+
+        # Trie : score RH d'abord, puis confiance
+        candidats_rh.sort(key=lambda x: (x["_score_rh"], x["confiance"]), reverse=True)
+        meilleur = candidats_rh[0]
+        meilleur.pop("_score_rh")
+        return meilleur
+
     except Exception:
         return None
 
@@ -81,8 +111,8 @@ def trouver_email_recruteur(entreprise: str, domaine: str = None) -> dict | None
             return result
         domaine = alt  # utilise l'alt pour la suite
 
-    # Étape 4 : essayer des adresses RH génériques via email-verifier
-    prefixes_rh = ["recrutement", "rh", "emploi", "jobs", "careers", "talent"]
+    # Étape 4 : essayer des adresses RH génériques via email-verifier (seulement préfixes RH stricts)
+    prefixes_rh = ["recrutement", "rh", "recruitment", "talent", "careers", "emploi", "jobs", "drh", "hr"]
     for prefix in prefixes_rh:
         email_test = f"{prefix}@{domaine}"
         try:
