@@ -446,8 +446,11 @@ def _login(page) -> bool:
         from turso_sync import sauvegarder_cookies_linkedin
 
         # Login direct email/password
-        page.goto("https://www.linkedin.com/login", timeout=20000)
-        page.wait_for_load_state("networkidle", timeout=10000)
+        page.goto("https://www.linkedin.com/login", timeout=30000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
         _pause(2, 3)
 
         page.fill("#username", LINKEDIN_EMAIL)
@@ -455,7 +458,10 @@ def _login(page) -> bool:
         page.fill("#password", LINKEDIN_PASSWORD)
         _pause(0.5, 1.5)
         page.click("button[type='submit']")
-        page.wait_for_load_state("networkidle", timeout=15000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
         _pause(3, 5)
 
         # Screenshot systématique pour voir où on en est
@@ -486,6 +492,10 @@ def _login(page) -> bool:
         return False
     except Exception as e:
         print(f"   ❌ Erreur login : {e}")
+        try:
+            _telegram_screenshot(page, f"❌ Exception login : {str(e)[:80]}")
+        except Exception:
+            _telegram(f"❌ Exception login : {str(e)[:200]}")
         return False
 
 
