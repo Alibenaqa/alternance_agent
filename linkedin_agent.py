@@ -395,6 +395,17 @@ def _login(page) -> bool:
             page.context.add_cookies(cookies)
             page.goto("https://www.linkedin.com/feed", timeout=20000)
             _pause(2, 3)
+            # Gère la page "Welcome Back" (sélecteur de compte)
+            if "welcome-back" in page.url or page.locator("text=Welcome Back").count() > 0 or page.locator("text=Bon retour").count() > 0:
+                print("   ⚠️  Page Welcome Back — clic sur le compte")
+                btn_compte = page.locator("div[class*='account-list'] li, div[data-test*='account'], li[class*='account']").first
+                if not btn_compte.count():
+                    btn_compte = page.locator(f"text={LINKEDIN_EMAIL[:6]}").first
+                if btn_compte.count():
+                    btn_compte.click()
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                    _pause(2, 3)
+
             if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
                 print("   ✅ LinkedIn connecté via cookies")
                 _telegram_screenshot(page, f"✅ Connecté via cookies — {page.url[:80]}")
