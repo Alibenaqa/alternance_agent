@@ -40,6 +40,7 @@ from candidater import run_candidatures_auto, envoyer_resume_quotidien, envoyer_
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso, restaurer_tout_depuis_turso
 from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
+from linkedin_agent import run_linkedin_session, generer_post_linkedin, get_commentaires_pending, publier_post, poster_commentaire_approuve
 from memory import Memory
 from dashboard import start_dashboard
 
@@ -59,7 +60,7 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GMAIL_ADDRESS     = os.environ.get("GMAIL_ADDRESS", "mohamedalibenaqa@gmail.com")
 PROFIL_PATH       = Path(__file__).parent / "profil_ali.json"
 
-INTERVALLE_HEURES = 8
+INTERVALLE_HEURES = 4
 
 conversation_history: list[dict] = []
 
@@ -321,6 +322,23 @@ async def job_stats_hebdo(context: ContextTypes.DEFAULT_TYPE):
     await loop.run_in_executor(None, envoyer_stats_hebdo)
 
 
+async def job_linkedin_session(context: ContextTypes.DEFAULT_TYPE):
+    """Lance une session LinkedIn autonome (connexions + commentaires)."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    weekday = now.weekday()  # 0=lundi, 5=samedi, 6=dimanche
+
+    # Pas d'activité le weekend
+    if weekday >= 5:
+        log.info("⏸️  LinkedIn session — weekend, skip")
+        return
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    app = context.application
+    await loop.run_in_executor(None, lambda: run_linkedin_session(app))
+
+
 # ────────────────────────────────────────────────
 # HANDLERS TELEGRAM
 # ────────────────────────────────────────────────
@@ -371,6 +389,34 @@ async def cmd_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import asyncio
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, run_cycle)
+
+
+async def cmd_linkedin_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Génère et propose un post LinkedIn depuis Telegram. Usage: /linkedin_post <sujet>"""
+    if not _check(update): return
+    sujet = " ".join(context.args) if context.args else ""
+    if not sujet:
+        await update.message.reply_text("Usage : /linkedin_post <décris ton projet ou sujet>\nEx: /linkedin_post j'ai terminé mon agent IA de recherche d'alternance en Python")
+        return
+
+    await update.message.reply_text("⏳ Génération du post LinkedIn en cours...")
+    import asyncio
+    texte = await asyncio.get_event_loop().run_in_executor(None, lambda: generer_post_linkedin(sujet))
+
+    if not texte:
+        await update.message.reply_text("❌ Erreur lors de la génération du post.")
+        return
+
+    cle = f"post_{int(__import__('time').time())}"
+    from linkedin_agent import get_posts_pending
+    get_posts_pending()[cle] = texte
+
+    apercu = f"📝 <b>Post LinkedIn généré :</b>\n\n{texte}\n\n<i>Approuves-tu ce post ?</i>"
+    buttons = [[
+        {"text": "✅ Publier", "callback_data": f"linkedin_post_ok:{cle}"},
+        {"text": "❌ Annuler", "callback_data": f"linkedin_post_cancel:{cle}"},
+    ]]
+    await update.message.reply_text(apercu, parse_mode="HTML", reply_markup={"inline_keyboard": buttons})
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -723,6 +769,74 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text("❌ Annulé.")
 
+    elif data.startswith("linkedin_comment_ok:"):
+        cle = data[len("linkedin_comment_ok:"):]
+        pending = get_commentaires_pending().get(cle)
+        if not pending:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⚠️ Commentaire expiré ou déjà traité.")
+        else:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⏳ Publication du commentaire en cours...")
+
+            def _poster():
+                from playwright.sync_api import sync_playwright
+                from linkedin_agent import _launch_browser, _login, _commentaires_pending as _cp
+                import asyncio as _aio
+                with sync_playwright() as p:
+                    browser, ctx = _launch_browser(p)
+                    page = ctx.new_page()
+                    ok = False
+                    if _login(page):
+                        # poster_commentaire_approuve est async → on l'exécute dans un loop dédié
+                        loop = _aio.new_event_loop()
+                        ok = loop.run_until_complete(poster_commentaire_approuve(cle, page))
+                        loop.close()
+                    browser.close()
+                    return ok
+
+            import asyncio
+            ok = await asyncio.get_event_loop().run_in_executor(None, _poster)
+            await query.message.reply_text("✅ Commentaire posté !" if ok else "❌ Impossible de poster le commentaire.")
+
+    elif data.startswith("linkedin_post_ok:"):
+        cle = data[len("linkedin_post_ok:"):]
+        from linkedin_agent import get_posts_pending
+        texte = get_posts_pending().pop(cle, None)
+        if not texte:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⚠️ Post expiré ou déjà publié.")
+        else:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⏳ Publication sur LinkedIn en cours...")
+
+            def _publier():
+                from playwright.sync_api import sync_playwright
+                from linkedin_agent import _launch_browser, _login
+                with sync_playwright() as p:
+                    browser, ctx = _launch_browser(p)
+                    page = ctx.new_page()
+                    ok = _login(page) and publier_post(page, texte)
+                    browser.close()
+                    return ok
+
+            import asyncio
+            ok = await asyncio.get_event_loop().run_in_executor(None, _publier)
+            await query.message.reply_text("✅ Post publié sur LinkedIn !" if ok else "❌ Impossible de publier le post.")
+
+    elif data.startswith("linkedin_post_cancel:"):
+        cle = data[len("linkedin_post_cancel:"):]
+        from linkedin_agent import get_posts_pending
+        get_posts_pending().pop(cle, None)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("❌ Post annulé.")
+
+    elif data.startswith("linkedin_comment_skip:"):
+        cle = data[len("linkedin_comment_skip:"):]
+        get_commentaires_pending().pop(cle, None)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("⏭️ Commentaire ignoré.")
+
     elif data.startswith("relance_"):
         from reponses import envoyer_relances_auto
         cand_id = int(data[8:])
@@ -784,8 +898,9 @@ def main():
     app.add_handler(CommandHandler("alumni",       cmd_alumni))
     app.add_handler(CommandHandler("relances",     cmd_relances))
     app.add_handler(CommandHandler("entretiens",   cmd_entretiens))
-    app.add_handler(CommandHandler("help",         cmd_help))
-    app.add_handler(CommandHandler("status",       cmd_status))
+    app.add_handler(CommandHandler("help",           cmd_help))
+    app.add_handler(CommandHandler("status",         cmd_status))
+    app.add_handler(CommandHandler("linkedin_post",  cmd_linkedin_post))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
@@ -810,6 +925,30 @@ def main():
         time=datetime.strptime("09:00", "%H:%M").time(),
         days=(0,),  # 0 = lundi
     )
+
+    # ── Sessions LinkedIn autonomes ──────────────────────────────
+    # Lundi : 3 sessions entre 6h et 17h (06h, 10h, 14h + jitter)
+    from datetime import timezone as _tz
+    import random as _rnd
+
+    for heure_base in ["06:00", "10:00", "14:00"]:
+        t = datetime.strptime(heure_base, "%H:%M").replace(tzinfo=_tz.utc).time()
+        app.job_queue.run_daily(
+            job_linkedin_session,
+            time=t,
+            days=(0,),  # lundi
+            name=f"linkedin_lundi_{heure_base}",
+        )
+
+    # Mardi–Vendredi : 2 sessions entre 9h et 17h (09h30 et 14h30)
+    for heure_base in ["09:30", "14:30"]:
+        t = datetime.strptime(heure_base, "%H:%M").replace(tzinfo=_tz.utc).time()
+        app.job_queue.run_daily(
+            job_linkedin_session,
+            time=t,
+            days=(1, 2, 3, 4),  # mar-ven
+            name=f"linkedin_semaine_{heure_base}",
+        )
 
     # Gestion des erreurs (conflit Railway au redéploiement)
     async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
