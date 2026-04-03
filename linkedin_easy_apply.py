@@ -427,17 +427,16 @@ def run_linkedin_easy_apply() -> dict:
     stats = {"candidatures": 0, "echecs": 0}
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",               # requis dans les conteneurs Docker/Railway
-                "--disable-dev-shm-usage",    # évite les crash mémoire partagée
-                "--disable-gpu",
-                "--disable-setuid-sandbox",
-                "--no-first-run",
-                "--no-zygote",
-            ],
-        )
+        import shutil
+        chromium_path = next((shutil.which(c) for c in ["chromium", "chromium-browser", "google-chrome"] if shutil.which(c)), None)
+        launch_args = {
+            "headless": True,
+            "args": ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+                     "--disable-setuid-sandbox", "--no-first-run", "--no-zygote"],
+        }
+        if chromium_path:
+            launch_args["executable_path"] = chromium_path
+        browser = p.chromium.launch(**launch_args)
         ctx = browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

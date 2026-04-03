@@ -326,11 +326,28 @@ def _pause_humaine():
     time.sleep(random.uniform(3, 8))
 
 
+def _get_chromium_path() -> str | None:
+    """Trouve le chemin du Chromium système (Railway/nix) ou retourne None."""
+    import shutil
+    for candidate in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
+        path = shutil.which(candidate)
+        if path:
+            return path
+    return None
+
+
 def _launch_browser(playwright):
-    browser = playwright.chromium.launch(
-        headless=True,
-        args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-zygote"],
-    )
+    chromium_path = _get_chromium_path()
+    launch_kwargs = {
+        "headless": True,
+        "args": ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+                 "--no-zygote", "--disable-setuid-sandbox"],
+    }
+    if chromium_path:
+        print(f"   🌐 Chromium système : {chromium_path}")
+        launch_kwargs["executable_path"] = chromium_path
+
+    browser = playwright.chromium.launch(**launch_kwargs)
     ctx = browser.new_context(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
