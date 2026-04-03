@@ -92,6 +92,20 @@ def _attendre_code_verification(timeout: int = 300) -> str | None:
 # TELEGRAM
 # ─────────────────────────────────────────────────────
 
+def _telegram_screenshot(page, legende: str = "Screenshot"):
+    """Prend un screenshot et l'envoie sur Telegram."""
+    try:
+        img = page.screenshot(full_page=False)
+        req.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+            data={"chat_id": TELEGRAM_CHAT_ID, "caption": legende},
+            files={"photo": ("screen.png", img, "image/png")},
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"   ❌ Screenshot : {e}")
+
+
 def _telegram(texte: str, buttons: list = None):
     """Envoie un message Telegram, avec boutons inline optionnels."""
     payload = {
@@ -614,6 +628,7 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
         page.goto("https://www.linkedin.com/feed/", timeout=20000)
         page.wait_for_load_state("networkidle", timeout=10000)
         _pause_humaine()
+        _telegram_screenshot(page, f"🔍 Feed LinkedIn — URL: {page.url[:80]}")
 
         # Scroll pour charger plus de posts
         for _ in range(4):
