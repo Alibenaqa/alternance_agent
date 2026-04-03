@@ -25,6 +25,16 @@ import requests as req
 
 import anthropic
 
+from hunter import trouver_email_recruteur
+from emailer import envoyer_email
+
+MOTS_RH = ["rh", "hr", "recruteur", "recrutement", "recruitment", "talent", "people",
+           "chro", "drh", "staffing", "talent acquisition", "hiring manager"]
+MOTS_DATA_TECH = ["data analyst", "data scientist", "data engineer", "machine learning",
+                  "ml engineer", "ai engineer", "devops", "mlops", "software engineer",
+                  "développeur", "developer", "bi analyst", "business intelligence",
+                  "analytics", "ingénieur données", "fullstack", "backend", "frontend"]
+
 LINKEDIN_EMAIL    = os.environ.get("LINKEDIN_EMAIL", "")
 LINKEDIN_PASSWORD = os.environ.get("LINKEDIN_PASSWORD", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -100,6 +110,138 @@ def _claude(prompt: str, max_tokens: int = 300) -> str:
     except Exception as e:
         print(f"   ❌ Claude : {e}")
         return ""
+
+
+def _classifier_profil(poste: str) -> str:
+    """Retourne 'rh', 'data_tech', ou 'autre'."""
+    p = poste.lower()
+    if any(m in p for m in MOTS_RH):
+        return "rh"
+    if any(m in p for m in MOTS_DATA_TECH):
+        return "data_tech"
+    return "autre"
+
+
+def _generer_email_profil(profil: dict, type_profil: str) -> dict:
+    """Génère un email adapté selon le type de profil (rh ou data_tech)."""
+    prenom    = profil.get("prenom", "")
+    poste     = profil.get("poste", "")
+    entreprise = profil.get("entreprise", "")
+
+    if type_profil == "rh":
+        prompt = f"""Rédige un email de candidature d'Ali Benaqa à destination d'un RH/recruteur trouvé sur LinkedIn.
+
+DESTINATAIRE :
+- Prénom : {prenom}
+- Poste : {poste}
+- Entreprise : {entreprise}
+
+PROFIL ALI :
+- 2e année Bachelor Data & IA, Hetic (3e année dès sept. 2026)
+- Cherche alternance oct 2026, 12-36 mois, Paris/IDF ou remote
+- Expériences : Data Analyst freelance Techwin (ETL Python), Reporting Analyst Mamda Assurance (Power BI/PHP), Data Analyst BNC Corporation (KPI/EViews)
+- Projets : Alternance Agent (Python/Claude API/Railway), AniData Lab (ETL 57M ratings), Dream Interpreter (LLM+Whisper)
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Node.js, React, Docker, Git
+
+RÈGLES :
+- Commence par "Bonjour {prenom},"
+- 3 paragraphes, 130-160 mots MAX
+- Pas de "je me permets", "passionné", "dynamique", "opportunité"
+- Mentionne qu'il a trouvé leur profil sur LinkedIn
+- Demande clairement si {entreprise} recrute des alternants data/IA pour oct 2026
+- Ton direct, professionnel mais humain
+- Signature : Ali Benaqa | Hetic Bachelor Data & IA | +33 6 67 67 79 37
+- Format : OBJET: [sujet]\\n---\\n[corps]"""
+
+    else:  # data_tech
+        prompt = f"""Rédige un email de networking d'Ali Benaqa à destination d'un professionnel data/tech trouvé sur LinkedIn.
+
+DESTINATAIRE :
+- Prénom : {prenom}
+- Poste : {poste}
+- Entreprise : {entreprise}
+
+PROFIL ALI :
+- 2e année Bachelor Data & IA, Hetic (3e année dès sept. 2026)
+- Cherche alternance oct 2026 en data/IA
+- Construit des projets concrets : agent IA autonome (Python/Claude API), pipeline ETL 57M données, app LLM+Whisper
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Docker
+
+RÈGLES :
+- Commence par "Bonjour {prenom},"
+- 2-3 paragraphes, 120-150 mots MAX
+- Ton chaleureux et curieux, pas corporate
+- Mentionne qu'il a vu leur profil LinkedIn et trouvé leur parcours intéressant
+- Demande des conseils/retours d'expérience sur leur domaine
+- Mentionne brièvement un de ses projets concrets pour montrer son niveau
+- PAS de demande de stage/alternance explicite (c'est du networking pur)
+- Signature : Ali Benaqa | Hetic Bachelor Data & IA | +33 6 67 67 79 37
+- Format : OBJET: [sujet]\\n---\\n[corps]"""
+
+    texte = _claude(prompt, max_tokens=400)
+    if not texte:
+        return {}
+
+    objet = f"Networking LinkedIn — Ali Benaqa"
+    corps = texte
+    if "OBJET:" in texte and "---" in texte:
+        parties = texte.split("---", 1)
+        objet = parties[0].replace("OBJET:", "").strip()
+        corps = parties[1].strip()
+
+    return {"objet": objet, "corps": corps}
+
+
+def _tenter_email_profil(profil: dict, type_profil: str) -> bool:
+    """Cherche l'email du profil via Hunter et envoie un email adapté."""
+    entreprise = profil.get("entreprise", "")
+    if not entreprise:
+        return False
+
+    print(f"   📧 Recherche email pour {profil['nom']} ({entreprise})...")
+    contact = trouver_email_recruteur(entreprise)
+    if not contact:
+        print(f"   ❌ Aucun email trouvé pour {entreprise}")
+        return False
+
+    # Construit l'email personnalisé avec prénom.nom@domaine si possible
+    import unicodedata
+    def _norm(s):
+        return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
+
+    domaine = contact.get("domaine", "")
+    prenom_n = _norm(profil.get("prenom", ""))
+    nom_parts = profil.get("nom", "").split()
+    nom_n = _norm(nom_parts[-1]) if nom_parts else ""
+    if prenom_n and nom_n and domaine:
+        email_dest = f"{prenom_n}.{nom_n}@{domaine}"
+    else:
+        email_dest = contact.get("email", "")
+
+    if not email_dest:
+        return False
+
+    email_data = _generer_email_profil(profil, type_profil)
+    if not email_data:
+        return False
+
+    ok = envoyer_email(
+        destinataire=email_dest,
+        sujet=email_data["objet"],
+        corps=email_data["corps"],
+    )
+
+    if ok:
+        icon = "📧" if type_profil == "rh" else "🤝"
+        print(f"   ✅ Email {type_profil} envoyé à {email_dest}")
+        _telegram(
+            f"{icon} <b>Email LinkedIn envoyé</b>\n"
+            f"👤 {profil['nom']} — {profil['poste']} @ {entreprise}\n"
+            f"📬 {email_dest}\n"
+            f"📋 {email_data['objet']}"
+        )
+
+    return ok
 
 
 def _generer_note_connexion(prenom: str, poste: str, entreprise: str) -> str:
@@ -361,6 +503,10 @@ def run_connexions(page, nb_connexions: int) -> int:
                 break
 
             print(f"   ➡️  {profil['nom']} — {profil['poste']} @ {profil['entreprise']}")
+
+            # Classifie le profil pour adapter l'approche
+            type_profil = _classifier_profil(profil["poste"])
+
             note = _generer_note_connexion(profil["prenom"], profil["poste"], profil["entreprise"])
             ok = _envoyer_connexion(page, profil["url"], note)
 
@@ -373,6 +519,11 @@ def run_connexions(page, nb_connexions: int) -> int:
                     f"💼 {profil['poste']} @ {profil['entreprise']}\n"
                     f"📝 Note : {note[:100]}..."
                 )
+
+                # Tente aussi un email si profil RH ou data/tech
+                if type_profil in ("rh", "data_tech") and profil.get("entreprise"):
+                    _pause(2, 4)
+                    _tenter_email_profil(profil, type_profil)
             else:
                 print(f"   ⏭️  Échec")
 
