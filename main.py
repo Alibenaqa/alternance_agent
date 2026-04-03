@@ -43,7 +43,7 @@ from linkedin_easy_apply import run_linkedin_easy_apply
 from linkedin_agent import (run_linkedin_session, generer_post_linkedin, get_commentaires_pending,
                             publier_post, poster_commentaire_approuve, get_messages_pending,
                             envoyer_reponse_message, get_dms_pending, envoyer_dm_approuve,
-                            set_linkedin_code)
+                            set_linkedin_code, get_screenshot)
 from memory import Memory
 from dashboard import start_dashboard
 
@@ -404,6 +404,16 @@ async def cmd_linkedin_session(update: Update, context: ContextTypes.DEFAULT_TYP
         await asyncio.get_event_loop().run_in_executor(None, lambda: run_linkedin_session(app))
     except Exception as e:
         await update.message.reply_text(f"❌ Erreur session LinkedIn : {str(e)[:300]}")
+
+
+async def cmd_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Envoie un screenshot de la page LinkedIn active."""
+    if not _check(update): return
+    img = get_screenshot()
+    if img is None:
+        await update.message.reply_text("⚠️ Aucune session LinkedIn active en ce moment.")
+        return
+    await context.bot.send_photo(chat_id=update.effective_chat.id, photo=img, caption=f"📸 Screenshot LinkedIn")
 
 
 async def cmd_linkedin_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -989,6 +999,7 @@ def main():
     app.add_handler(CommandHandler("linkedin_post",    cmd_linkedin_post))
     app.add_handler(CommandHandler("linkedin_session", cmd_linkedin_session))
     app.add_handler(CommandHandler("linkedin_code",    cmd_linkedin_code))
+    app.add_handler(CommandHandler("screenshot",       cmd_screenshot))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))

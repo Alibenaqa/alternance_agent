@@ -60,6 +60,19 @@ RECHERCHES_CONNEXION = [
 
 NOTE_MAX_CHARS = 300  # LinkedIn limite les notes de connexion
 
+_current_page = None  # page Playwright active pendant une session
+
+
+def get_screenshot() -> bytes | None:
+    """Retourne un screenshot de la page LinkedIn active, ou None."""
+    global _current_page
+    if _current_page is None:
+        return None
+    try:
+        return _current_page.screenshot(full_page=False)
+    except Exception:
+        return None
+
 # ─────────────────────────────────────────────────────
 # VERIFICATION CODE (LinkedIn 2FA)
 # ─────────────────────────────────────────────────────
@@ -1296,6 +1309,8 @@ def run_linkedin_session(app=None) -> dict:
     with sync_playwright() as p:
         browser, ctx = _launch_browser(p)
         page = ctx.new_page()
+        global _current_page
+        _current_page = page
 
         if not _login(page):
             print("   ❌ Login LinkedIn échoué")
@@ -1357,6 +1372,7 @@ def run_linkedin_session(app=None) -> dict:
                 _telegram(f"❌ Erreur lors de <b>{action}</b> : {str(e)[:100]}")
 
         browser.close()
+        _current_page = None
 
     msg = (
         f"🌐 <b>Session LinkedIn terminée</b>\n"
