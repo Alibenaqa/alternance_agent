@@ -40,7 +40,9 @@ from candidater import run_candidatures_auto, envoyer_resume_quotidien, envoyer_
 from turso_sync import init_turso, restaurer_statuts_depuis_turso, sync_candidatures_vers_turso, restaurer_tout_depuis_turso
 from alumni_linkedin import run_alumni_outreach
 from linkedin_easy_apply import run_linkedin_easy_apply
-from linkedin_agent import run_linkedin_session, generer_post_linkedin, get_commentaires_pending, publier_post, poster_commentaire_approuve
+from linkedin_agent import (run_linkedin_session, generer_post_linkedin, get_commentaires_pending,
+                            publier_post, poster_commentaire_approuve, get_messages_pending,
+                            envoyer_reponse_message, get_dms_pending, envoyer_dm_approuve)
 from memory import Memory
 from dashboard import start_dashboard
 
@@ -845,6 +847,66 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         get_commentaires_pending().pop(cle, None)
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text("⏭️ Commentaire ignoré.")
+
+    elif data.startswith("linkedin_msg_ok:"):
+        cle = data[len("linkedin_msg_ok:"):]
+        pending = get_messages_pending().get(cle)
+        if not pending:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⚠️ Message expiré.")
+        else:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⏳ Envoi de la réponse en cours...")
+
+            def _repondre():
+                from playwright.sync_api import sync_playwright
+                from linkedin_agent import _launch_browser, _login
+                with sync_playwright() as p:
+                    browser, ctx = _launch_browser(p)
+                    page = ctx.new_page()
+                    ok = _login(page) and envoyer_reponse_message(cle, page)
+                    browser.close()
+                    return ok
+
+            import asyncio
+            ok = await asyncio.get_event_loop().run_in_executor(None, _repondre)
+            await query.message.reply_text("✅ Réponse envoyée !" if ok else "❌ Erreur envoi réponse.")
+
+    elif data.startswith("linkedin_msg_skip:"):
+        cle = data[len("linkedin_msg_skip:"):]
+        get_messages_pending().pop(cle, None)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("⏭️ Message ignoré.")
+
+    elif data.startswith("linkedin_dm_ok:"):
+        cle = data[len("linkedin_dm_ok:"):]
+        pending = get_dms_pending().get(cle)
+        if not pending:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⚠️ DM expiré.")
+        else:
+            await query.edit_message_reply_markup(reply_markup=None)
+            await query.message.reply_text("⏳ Envoi du DM en cours...")
+
+            def _envoyer_dm():
+                from playwright.sync_api import sync_playwright
+                from linkedin_agent import _launch_browser, _login
+                with sync_playwright() as p:
+                    browser, ctx = _launch_browser(p)
+                    page = ctx.new_page()
+                    ok = _login(page) and envoyer_dm_approuve(cle, page)
+                    browser.close()
+                    return ok
+
+            import asyncio
+            ok = await asyncio.get_event_loop().run_in_executor(None, _envoyer_dm)
+            await query.message.reply_text("✅ DM envoyé !" if ok else "❌ Erreur envoi DM.")
+
+    elif data.startswith("linkedin_dm_skip:"):
+        cle = data[len("linkedin_dm_skip:"):]
+        get_dms_pending().pop(cle, None)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("⏭️ DM ignoré.")
 
     elif data.startswith("relance_"):
         from reponses import envoyer_relances_auto

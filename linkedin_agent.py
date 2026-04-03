@@ -679,6 +679,407 @@ async def poster_commentaire_approuve(cle: str, page) -> bool:
 
 
 # ─────────────────────────────────────────────────────
+# LIKES AUTOMATIQUES
+# ─────────────────────────────────────────────────────
+
+def run_likes(page, nb_likes: int) -> int:
+    """Like des posts pertinents du feed. Retourne le nombre de likes."""
+    if nb_likes == 0:
+        return 0
+
+    print(f"\n👍 Likes LinkedIn — {nb_likes} cibles")
+    try:
+        page.goto("https://www.linkedin.com/feed/", timeout=20000)
+        _pause_humaine()
+
+        for _ in range(4):
+            page.evaluate("window.scrollBy(0, 600)")
+            _pause(1, 2)
+
+        articles = page.locator("div.feed-shared-update-v2").all()
+        random.shuffle(articles)
+        likes = 0
+
+        for article in articles:
+            if likes >= nb_likes:
+                break
+            try:
+                contenu_el = article.locator("div.feed-shared-text").first
+                contenu = contenu_el.inner_text().strip() if contenu_el.count() else ""
+
+                if not contenu or not _evaluer_post(contenu):
+                    continue
+
+                # Cherche le bouton Like (pas déjà liké)
+                btn_like = article.locator(
+                    "button[aria-label*='Like'], button[aria-label*='J\\'aime']"
+                ).first
+                if not btn_like.is_visible():
+                    continue
+
+                # Vérifie qu'il n'est pas déjà liké
+                aria = btn_like.get_attribute("aria-pressed") or ""
+                if aria == "true":
+                    continue
+
+                btn_like.click()
+                likes += 1
+                print(f"   👍 Post liké ({likes}/{nb_likes})")
+                _pause(3, 8)  # pause humaine entre likes
+
+            except Exception:
+                continue
+
+        return likes
+    except Exception as e:
+        print(f"   ❌ Likes : {e}")
+        return 0
+
+
+# ─────────────────────────────────────────────────────
+# MESSAGES REÇUS (réponse avec approbation Telegram)
+# ─────────────────────────────────────────────────────
+
+_messages_pending: dict[str, dict] = {}
+
+
+def _generer_reponse_message(expediteur: str, poste_exp: str, contenu_msg: str) -> str:
+    prompt = f"""Rédige une réponse LinkedIn de la part d'Ali Benaqa.
+
+EXPÉDITEUR :
+- Nom : {expediteur}
+- Poste : {poste_exp}
+
+MESSAGE REÇU : {contenu_msg[:400]}
+
+PROFIL ALI :
+- 2e année Bachelor Data & IA, Hetic (3e année dès sept. 2026)
+- Cherche alternance oct 2026 en data/IA, Paris/IDF
+- Stack : Python, SQL, Power BI, ETL, JavaScript, Docker
+
+RÈGLES :
+- Réponse courte : 3-5 phrases max
+- Ton naturel et direct, pas corporate
+- Répond précisément au message reçu
+- Si c'est une opportunité → montre de l'intérêt et propose un échange
+- Si c'est du networking → remercie et engage la conversation
+- Commence par "Bonjour {expediteur.split()[0]},"
+
+Réponds uniquement avec le texte de la réponse."""
+
+    return _claude(prompt, max_tokens=200)
+
+
+def run_messages_recus(page, app=None) -> int:
+    """Lit les messages LinkedIn non lus et propose des réponses sur Telegram."""
+    print(f"\n📨 Lecture des messages LinkedIn...")
+    try:
+        page.goto("https://www.linkedin.com/messaging/", timeout=20000)
+        _pause_humaine()
+
+        # Récupère les conversations non lues
+        convs = page.locator("li.msg-conversation-listitem").all()
+        traites = 0
+
+        for conv in convs[:5]:  # max 5 messages par session
+            try:
+                # Vérifie si non lu (badge)
+                unread = conv.locator("span.notification-badge").count() > 0
+                if not unread:
+                    continue
+
+                conv.click()
+                _pause(1.5, 3)
+
+                # Nom expéditeur
+                nom_el = page.locator("h2.msg-entity-lockup__entity-title").first
+                nom_exp = nom_el.inner_text().strip() if nom_el.count() else "Inconnu"
+
+                # Poste expéditeur
+                poste_el = page.locator("p.msg-entity-lockup__headline").first
+                poste_exp = poste_el.inner_text().strip() if poste_el.count() else ""
+
+                # Dernier message reçu
+                msgs = page.locator("div.msg-s-message-list__event").all()
+                if not msgs:
+                    continue
+                dernier = msgs[-1].locator("p").inner_text().strip() if msgs[-1].locator("p").count() else ""
+                if not dernier or len(dernier) < 10:
+                    continue
+
+                reponse = _generer_reponse_message(nom_exp, poste_exp, dernier)
+                if not reponse:
+                    continue
+
+                cle = f"msg_{int(time.time())}_{traites}"
+                _messages_pending[cle] = {
+                    "reponse": reponse,
+                    "expediteur": nom_exp,
+                }
+
+                apercu = (
+                    f"📨 <b>Message LinkedIn reçu</b>\n\n"
+                    f"👤 <b>{nom_exp}</b> — {poste_exp}\n"
+                    f"💬 Message : {dernier[:200]}\n\n"
+                    f"✍️ <b>Réponse proposée :</b>\n{reponse}"
+                )
+                buttons = [[
+                    {"text": "✅ Envoyer", "callback_data": f"linkedin_msg_ok:{cle}"},
+                    {"text": "❌ Ignorer",  "callback_data": f"linkedin_msg_skip:{cle}"},
+                ]]
+                _telegram(apercu, buttons)
+                traites += 1
+                _pause(2, 4)
+
+            except Exception:
+                continue
+
+        print(f"   ✅ {traites} messages proposés sur Telegram")
+        return traites
+
+    except Exception as e:
+        print(f"   ❌ Messages : {e}")
+        return 0
+
+
+def envoyer_reponse_message(cle: str, page) -> bool:
+    """Envoie la réponse approuvée dans la conversation LinkedIn."""
+    pending = _messages_pending.pop(cle, None)
+    if not pending:
+        return False
+    try:
+        page.goto("https://www.linkedin.com/messaging/", timeout=20000)
+        _pause_humaine()
+
+        convs = page.locator("li.msg-conversation-listitem").all()
+        for conv in convs:
+            try:
+                nom_el = conv.locator("span.msg-conversation-listitem__participant-names").first
+                if pending["expediteur"].split()[0].lower() in nom_el.inner_text().lower():
+                    conv.click()
+                    _pause(1.5, 3)
+                    break
+            except Exception:
+                continue
+
+        textarea = page.locator("div.msg-form__contenteditable[contenteditable='true']").first
+        if textarea.is_visible():
+            textarea.click()
+            textarea.type(pending["reponse"], delay=random.randint(30, 70))
+            _pause(1, 2)
+            btn_send = page.locator("button.msg-form__send-button").first
+            if btn_send.is_visible():
+                btn_send.click()
+                _pause(1, 2)
+                return True
+    except Exception as e:
+        print(f"   ❌ Envoi réponse : {e}")
+    return False
+
+
+def get_messages_pending() -> dict:
+    return _messages_pending
+
+
+# ─────────────────────────────────────────────────────
+# VISITER PROFILS QUI ONT VU LE PROFIL D'ALI
+# ─────────────────────────────────────────────────────
+
+def run_visites_profils(page) -> int:
+    """Visite les profils des personnes qui ont consulté le profil d'Ali."""
+    print(f"\n👀 Visite des profils — qui a vu mon profil ?")
+    try:
+        page.goto("https://www.linkedin.com/analytics/profile-views/", timeout=20000)
+        _pause_humaine()
+
+        visiteurs = page.locator("li.profile-views-viewer").all()
+        if not visiteurs:
+            # Essai alternative
+            page.goto("https://www.linkedin.com/me/profile-views/", timeout=15000)
+            _pause_humaine()
+            visiteurs = page.locator("li.profile-views-viewer, div.pv-browsemap-section__member").all()
+
+        visites = 0
+        for visiteur in visiteurs[:8]:
+            try:
+                lien_el = visiteur.locator("a").first
+                if not lien_el.is_visible():
+                    continue
+                url = lien_el.get_attribute("href", timeout=2000) or ""
+                if "linkedin.com/in/" not in url:
+                    continue
+
+                nom_el = visiteur.locator("span.actor-name, span.name").first
+                nom = nom_el.inner_text().strip() if nom_el.count() else ""
+
+                # Visite le profil (ils reçoivent une notif)
+                page.goto(url.split("?")[0], timeout=15000)
+                _pause_humaine()  # simule la lecture du profil
+
+                visites += 1
+                print(f"   👀 Profil visité : {nom} ({url.split('/')[-1]})")
+
+                # Scroll pour simuler la lecture
+                for _ in range(2):
+                    page.evaluate("window.scrollBy(0, 400)")
+                    _pause(1, 2)
+
+                _pause(3, 7)
+            except Exception:
+                continue
+
+        print(f"   ✅ {visites} profils visités")
+        return visites
+
+    except Exception as e:
+        print(f"   ❌ Visites profils : {e}")
+        return 0
+
+
+# ─────────────────────────────────────────────────────
+# MESSAGES DIRECTS (InMail/DM) aux connexions 1er/2e degré
+# ─────────────────────────────────────────────────────
+
+_dms_pending: dict[str, dict] = {}
+
+
+def _generer_dm(prenom: str, poste: str, entreprise: str, type_profil: str) -> str:
+    if type_profil == "rh":
+        prompt = f"""Message LinkedIn direct (DM) de la part d'Ali Benaqa à un RH/recruteur.
+
+Destinataire : {prenom}, {poste} chez {entreprise}
+
+Contexte : Ali est en 2e année Bachelor Data & IA à Hetic, cherche alternance oct 2026.
+Ils sont déjà connectés sur LinkedIn.
+
+Rédige un message court (4-6 lignes) :
+- Commence par "Bonjour {prenom},"
+- Mentionne leur connexion LinkedIn
+- Demande directement si {entreprise} recrute des alternants data/IA pour oct 2026
+- Propose d'envoyer son CV
+- Ton direct et professionnel
+- Pas de "j'espère que vous allez bien", pas de langue de bois"""
+    else:
+        prompt = f"""Message LinkedIn direct (DM) de la part d'Ali Benaqa à un professionnel data/tech.
+
+Destinataire : {prenom}, {poste} chez {entreprise}
+
+Contexte : Ali est en 2e année Bachelor Data & IA à Hetic, cherche alternance oct 2026.
+Ils sont déjà connectés sur LinkedIn.
+
+Rédige un message court (4-5 lignes) :
+- Commence par "Bonjour {prenom},"
+- Remercie pour la connexion acceptée
+- Mentionne un intérêt sincère pour leur domaine/entreprise
+- Pose une question concrète sur leur expérience ou leur domaine
+- Ton naturel et curieux, pas commercial"""
+
+    return _claude(prompt, max_tokens=180)
+
+
+def run_messages_directs(page, nb_dms: int, app=None) -> int:
+    """Envoie des DMs aux connexions 1er degré récentes (nouveaux contacts)."""
+    if nb_dms == 0:
+        return 0
+
+    print(f"\n💌 Messages directs — {nb_dms} cibles")
+    try:
+        # Récupère les connexions récentes (invitations acceptées)
+        page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", timeout=20000)
+        _pause_humaine()
+
+        cards = page.locator("li.mn-connection-card").all()
+        envoyes = 0
+
+        for card in cards[:nb_dms * 2]:
+            if envoyes >= nb_dms:
+                break
+            try:
+                nom_el = card.locator("span.mn-connection-card__name").first
+                poste_el = card.locator("span.mn-connection-card__occupation").first
+                lien_el = card.locator("a.mn-connection-card__link").first
+
+                nom = nom_el.inner_text().strip() if nom_el.count() else ""
+                poste = poste_el.inner_text().strip() if poste_el.count() else ""
+                url = lien_el.get_attribute("href") if lien_el.count() else ""
+                prenom = nom.split()[0] if nom else ""
+
+                if not nom or not url:
+                    continue
+
+                # Filtre : seulement data/tech/RH
+                type_profil = _classifier_profil(poste)
+                if type_profil == "autre":
+                    continue
+
+                dm = _generer_dm(prenom, poste, "", type_profil)
+                if not dm:
+                    continue
+
+                cle = f"dm_{int(time.time())}_{envoyes}"
+                _dms_pending[cle] = {"dm": dm, "url": url, "nom": nom}
+
+                apercu = (
+                    f"💌 <b>DM proposé</b>\n\n"
+                    f"👤 {nom} — {poste}\n\n"
+                    f"✍️ <b>Message :</b>\n{dm}"
+                )
+                buttons = [[
+                    {"text": "✅ Envoyer", "callback_data": f"linkedin_dm_ok:{cle}"},
+                    {"text": "❌ Skip",    "callback_data": f"linkedin_dm_skip:{cle}"},
+                ]]
+                _telegram(apercu, buttons)
+                envoyes += 1
+                _pause(2, 4)
+
+            except Exception:
+                continue
+
+        print(f"   ✅ {envoyes} DMs proposés sur Telegram")
+        return envoyes
+
+    except Exception as e:
+        print(f"   ❌ DMs : {e}")
+        return 0
+
+
+def envoyer_dm_approuve(cle: str, page) -> bool:
+    """Envoie le DM approuvé."""
+    pending = _dms_pending.pop(cle, None)
+    if not pending:
+        return False
+    try:
+        page.goto(pending["url"], timeout=20000)
+        _pause_humaine()
+
+        btn_msg = page.locator(
+            "button:has-text('Message'), button[aria-label*='Message']"
+        ).first
+        if not btn_msg.is_visible():
+            return False
+        btn_msg.click()
+        _pause(1.5, 3)
+
+        textarea = page.locator("div.msg-form__contenteditable[contenteditable='true']").first
+        if textarea.is_visible():
+            textarea.click()
+            textarea.type(pending["dm"], delay=random.randint(30, 70))
+            _pause(1, 2)
+            btn_send = page.locator("button.msg-form__send-button").first
+            if btn_send.is_visible():
+                btn_send.click()
+                _pause(1, 2)
+                return True
+    except Exception as e:
+        print(f"   ❌ Envoi DM : {e}")
+    return False
+
+
+def get_dms_pending() -> dict:
+    return _dms_pending
+
+
+# ─────────────────────────────────────────────────────
 # POSTS LINKEDIN (depuis Telegram /linkedin_post)
 # ─────────────────────────────────────────────────────
 
@@ -772,17 +1173,15 @@ def run_linkedin_session(app=None) -> dict:
     # Mix aléatoire du jour
     nb_connexions   = random.randint(0, 8)
     nb_commentaires = random.randint(0, 4)
+    nb_likes        = random.randint(0, 5)
+    nb_dms          = random.randint(0, 3)
+    faire_messages  = random.choice([True, False])  # messages reçus : 1 session sur 2
+    faire_visites   = random.choice([True, False])  # visites profils : 1 session sur 2
 
-    print(f"\n🌐 Session LinkedIn — {nb_connexions} connexions, {nb_commentaires} commentaires")
-    stats = {"connexions": 0, "commentaires": 0}
+    print(f"\n🌐 Session LinkedIn — {nb_connexions} connexions, {nb_commentaires} commentaires, "
+          f"{nb_likes} likes, {nb_dms} DMs, messages={faire_messages}, visites={faire_visites}")
 
-    # Ordre aléatoire des actions
-    actions = (["connexions"] * nb_connexions) + (["commentaires"] * nb_commentaires)
-    random.shuffle(actions)
-
-    # Regroupe pour éviter de re-login entre chaque action
-    nb_conn_final = actions.count("connexions")
-    nb_comm_final = actions.count("commentaires")
+    stats = {"connexions": 0, "commentaires": 0, "likes": 0, "dms": 0, "visites": 0, "messages": 0}
 
     with sync_playwright() as p:
         browser, ctx = _launch_browser(p)
@@ -796,24 +1195,47 @@ def run_linkedin_session(app=None) -> dict:
 
         print("   ✅ LinkedIn connecté")
 
-        # Connexions
-        if nb_conn_final > 0:
-            stats["connexions"] = run_connexions(page, nb_conn_final)
-            _pause(5, 15)
+        # Liste des actions à faire dans un ordre aléatoire
+        todo = []
+        if nb_connexions > 0:   todo.append("connexions")
+        if nb_likes > 0:        todo.append("likes")
+        if nb_commentaires > 0: todo.append("commentaires")
+        if faire_messages:      todo.append("messages")
+        if faire_visites:       todo.append("visites")
+        if nb_dms > 0:          todo.append("dms")
+        random.shuffle(todo)
 
-        # Commentaires
-        if nb_comm_final > 0:
-            stats["commentaires"] = run_commentaires(page, nb_comm_final, app)
+        for action in todo:
+            try:
+                if action == "connexions":
+                    stats["connexions"] = run_connexions(page, nb_connexions)
+                elif action == "likes":
+                    stats["likes"] = run_likes(page, nb_likes)
+                elif action == "commentaires":
+                    stats["commentaires"] = run_commentaires(page, nb_commentaires, app)
+                elif action == "messages":
+                    stats["messages"] = run_messages_recus(page, app)
+                elif action == "visites":
+                    stats["visites"] = run_visites_profils(page)
+                elif action == "dms":
+                    stats["dms"] = run_messages_directs(page, nb_dms, app)
+                _pause(5, 15)
+            except Exception as e:
+                print(f"   ❌ Action {action} : {e}")
 
         browser.close()
 
     msg = (
         f"🌐 <b>Session LinkedIn terminée</b>\n"
-        f"🔗 Connexions envoyées : {stats['connexions']}\n"
-        f"💬 Commentaires proposés : {stats['commentaires']}"
+        f"🔗 Connexions : {stats['connexions']}\n"
+        f"👍 Likes : {stats['likes']}\n"
+        f"💬 Commentaires proposés : {stats['commentaires']}\n"
+        f"📨 Messages traités : {stats['messages']}\n"
+        f"👀 Profils visités : {stats['visites']}\n"
+        f"💌 DMs proposés : {stats['dms']}"
     )
     _telegram(msg)
-    print(f"\n✅ Session LinkedIn — {stats['connexions']} connexions, {stats['commentaires']} commentaires proposés")
+    print(f"\n✅ Session LinkedIn terminée : {stats}")
     return stats
 
 
