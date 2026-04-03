@@ -457,10 +457,26 @@ def _login(page) -> bool:
             _pause(2, 3)
             _telegram_screenshot(page, f"🍪 Test cookies — {page.url[:80]}")
             if _est_connecte(page):
-                print("   ✅ LinkedIn connecté via cookies Chrome")
+                print("   ✅ LinkedIn connecté via cookies")
                 return True
             if _est_verification(page):
                 return _soumettre_code(page)
+            # Page d'accueil avec "Sign in as Mohamed Ali" — clic sur ce bouton
+            btn_signin = page.locator("a:has-text('Sign in as'), button:has-text('Sign in as')").first
+            if btn_signin.count() and btn_signin.is_visible():
+                print("   ⚠️  Page d'accueil — clic sur 'Sign in as Mohamed Ali'")
+                btn_signin.click()
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                _pause(2, 3)
+                _telegram_screenshot(page, f"🔍 Après clic Sign in as — {page.url[:80]}")
+                if _est_connecte(page):
+                    sauvegarder_cookies_linkedin(page.context.cookies())
+                    return True
+                if _est_verification(page):
+                    return _soumettre_code(page)
             print("   ⚠️  Cookies expirés ou invalides")
 
         # Fallback login email/password
