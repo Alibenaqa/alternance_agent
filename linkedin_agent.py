@@ -381,12 +381,24 @@ def _pause_humaine():
     time.sleep(random.uniform(3, 8))
 
 
+SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "")
+
+
 def _launch_browser(playwright):
-    browser = playwright.chromium.launch(
+    launch_kwargs = dict(
         headless=True,
         args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
               "--no-zygote", "--disable-setuid-sandbox"],
     )
+    # ScraperAPI proxy pour contourner le blocage IP de Railway
+    if SCRAPERAPI_KEY:
+        launch_kwargs["proxy"] = {
+            "server": "http://proxy-server.scraperapi.com:8001",
+            "username": "scraperapi",
+            "password": SCRAPERAPI_KEY,
+        }
+
+    browser = playwright.chromium.launch(**launch_kwargs)
     ctx = browser.new_context(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -394,6 +406,7 @@ def _launch_browser(playwright):
             "Chrome/122.0.0.0 Safari/537.36"
         ),
         viewport={"width": 1280, "height": 800},
+        ignore_https_errors=True,
     )
     return browser, ctx
 
