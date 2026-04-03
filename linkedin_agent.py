@@ -1194,6 +1194,21 @@ def run_linkedin_session(app=None) -> dict:
             return stats
 
         print("   ✅ LinkedIn connecté")
+        _telegram(
+            f"🌐 <b>Session LinkedIn démarrée</b>\n"
+            f"Plan du jour :\n"
+            f"  🔗 {nb_connexions} connexions\n"
+            f"  👍 {nb_likes} likes\n"
+            f"  💬 {nb_commentaires} commentaires\n"
+            f"  📨 Messages reçus : {'oui' if faire_messages else 'non'}\n"
+            f"  👀 Visites profils : {'oui' if faire_visites else 'non'}\n"
+            f"  💌 {nb_dms} DMs"
+        )
+
+        icons = {
+            "connexions": "🔗", "likes": "👍", "commentaires": "💬",
+            "messages": "📨", "visites": "👀", "dms": "💌"
+        }
 
         # Liste des actions à faire dans un ordre aléatoire
         todo = []
@@ -1207,21 +1222,29 @@ def run_linkedin_session(app=None) -> dict:
 
         for action in todo:
             try:
+                _telegram(f"{icons.get(action, '⚙️')} <b>Début : {action}...</b>")
                 if action == "connexions":
                     stats["connexions"] = run_connexions(page, nb_connexions)
+                    _telegram(f"✅ Connexions terminées : {stats['connexions']} envoyées")
                 elif action == "likes":
                     stats["likes"] = run_likes(page, nb_likes)
+                    _telegram(f"✅ Likes terminés : {stats['likes']} posts likés")
                 elif action == "commentaires":
                     stats["commentaires"] = run_commentaires(page, nb_commentaires, app)
+                    _telegram(f"✅ Commentaires terminés : {stats['commentaires']} proposés")
                 elif action == "messages":
                     stats["messages"] = run_messages_recus(page, app)
+                    _telegram(f"✅ Messages traités : {stats['messages']}")
                 elif action == "visites":
                     stats["visites"] = run_visites_profils(page)
+                    _telegram(f"✅ Visites terminées : {stats['visites']} profils visités")
                 elif action == "dms":
                     stats["dms"] = run_messages_directs(page, nb_dms, app)
+                    _telegram(f"✅ DMs terminés : {stats['dms']} proposés")
                 _pause(5, 15)
             except Exception as e:
                 print(f"   ❌ Action {action} : {e}")
+                _telegram(f"❌ Erreur lors de <b>{action}</b> : {str(e)[:100]}")
 
         browser.close()
 
