@@ -467,11 +467,24 @@ def _login(page) -> bool:
                 print("   ⚠️  Page d'accueil — clic sur 'Sign in as Mohamed Ali'")
                 btn_signin.click()
                 try:
-                    page.wait_for_load_state("networkidle", timeout=15000)
+                    page.wait_for_load_state("networkidle", timeout=10000)
                 except Exception:
                     pass
                 _pause(2, 3)
-                _telegram_screenshot(page, f"🔍 Après clic Sign in as — {page.url[:80]}")
+
+            # Page "Welcome back" avec champ Password
+            pwd_field = page.locator("input[type='password'], input[name='password'], input[placeholder*='assword']").first
+            if pwd_field.count() and pwd_field.is_visible():
+                print("   ⚠️  Champ mot de passe détecté — saisie automatique")
+                pwd_field.fill(LINKEDIN_PASSWORD)
+                _pause(0.5, 1)
+                page.locator("button:has-text('Sign in'), button[type='submit']").first.click()
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                _pause(3, 5)
+                _telegram_screenshot(page, f"🔍 Après mot de passe — {page.url[:80]}")
                 if _est_connecte(page):
                     sauvegarder_cookies_linkedin(page.context.cookies())
                     return True
