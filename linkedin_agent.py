@@ -92,12 +92,17 @@ def _attendre_code_verification(timeout: int = 600) -> str | None:
     # Reset AVANT d'envoyer le message (évite d'effacer un code arrivé trop vite)
     _verification_code = None
     _verification_event.clear()
-    _telegram(
+    base_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+    lien = f"https://{base_url}/set_code/XXXXXX" if base_url else ""
+    msg = (
         "🔐 <b>LinkedIn demande un code de vérification</b>\n"
-        "Vérifie ton email et envoie :\n"
-        "<code>/linkedin_code XXXXXX</code>\n"
-        "<i>(tu as 10 minutes)</i>"
+        "Vérifie ton email puis :\n"
+        "1. Envoie <code>/linkedin_code XXXXXX</code>\n"
     )
+    if lien:
+        msg += f"2. Ou ouvre ce lien (plus fiable) :\n{lien.replace('XXXXXX', '<b>COLLE_LE_CODE_ICI</b>')}\n"
+    msg += "<i>(tu as 10 minutes)</i>"
+    _telegram(msg)
     if _verification_event.wait(timeout=timeout):
         code = _verification_code
         _verification_code = None

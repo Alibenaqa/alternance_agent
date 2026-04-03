@@ -47,6 +47,17 @@ def _turso_stats():
         return {}, None
 
 
+@app.route("/set_code/<code>")
+def set_verification_code(code: str):
+    """Route Flask pour transmettre le code 2FA LinkedIn sans passer par Telegram."""
+    try:
+        from linkedin_agent import set_linkedin_code
+        set_linkedin_code(code.strip())
+        return f"<h2>✅ Code {code} transmis à LinkedIn.</h2>", 200
+    except Exception as e:
+        return f"<h2>❌ Erreur : {e}</h2>", 500
+
+
 @app.route("/api/stats")
 def api_stats():
     mem = Memory()
