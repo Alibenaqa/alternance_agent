@@ -37,6 +37,32 @@ def _turso(sql: str, args: list = None) -> dict:
     return resp.json()
 
 
+def sauvegarder_cookies_linkedin(cookies: list):
+    """Sauvegarde les cookies LinkedIn dans Turso."""
+    import json
+    try:
+        _turso("CREATE TABLE IF NOT EXISTS linkedin_cookies (id INTEGER PRIMARY KEY, data TEXT, updated_at TEXT DEFAULT (datetime('now')))")
+        data = json.dumps(cookies)
+        _turso("DELETE FROM linkedin_cookies")
+        _turso("INSERT INTO linkedin_cookies (data) VALUES (?)", [data])
+    except Exception as e:
+        print(f"⚠️  Turso save cookies : {e}")
+
+
+def charger_cookies_linkedin() -> list:
+    """Charge les cookies LinkedIn depuis Turso."""
+    import json
+    try:
+        _turso("CREATE TABLE IF NOT EXISTS linkedin_cookies (id INTEGER PRIMARY KEY, data TEXT, updated_at TEXT DEFAULT (datetime('now')))")
+        r = _turso("SELECT data FROM linkedin_cookies ORDER BY id DESC LIMIT 1")
+        rows = r.get("results", [{}])[0].get("response", {}).get("result", {}).get("rows", [])
+        if rows:
+            return json.loads(rows[0][0]["value"])
+    except Exception as e:
+        print(f"⚠️  Turso load cookies : {e}")
+    return []
+
+
 def init_turso():
     """Crée les tables sur Turso si elles n'existent pas."""
     try:

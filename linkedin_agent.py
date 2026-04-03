@@ -373,6 +373,19 @@ def _launch_browser(playwright):
 
 def _login(page) -> bool:
     try:
+        from turso_sync import charger_cookies_linkedin, sauvegarder_cookies_linkedin
+
+        # Essai avec les cookies sauvegardés
+        cookies = charger_cookies_linkedin()
+        if cookies:
+            page.context.add_cookies(cookies)
+            page.goto("https://www.linkedin.com/feed", timeout=20000)
+            _pause(2, 3)
+            if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
+                print("   ✅ LinkedIn connecté via cookies")
+                return True
+            print("   ⚠️  Cookies expirés, reconnexion par email/password")
+
         page.goto("https://www.linkedin.com/login", timeout=20000)
         _pause(2, 4)
         page.fill("#username", LINKEDIN_EMAIL)
@@ -384,6 +397,7 @@ def _login(page) -> bool:
         _pause(2, 4)
 
         if any(x in page.url for x in ["feed", "mynetwork", "jobs"]):
+            sauvegarder_cookies_linkedin(page.context.cookies())
             return True
         if "checkpoint" in page.url or "challenge" in page.url or "verification" in page.url:
             print("   ⚠️  LinkedIn demande un code de vérification")
@@ -400,6 +414,7 @@ def _login(page) -> bool:
                 page.wait_for_load_state("networkidle", timeout=15000)
                 _pause(2, 3)
                 if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
+                    sauvegarder_cookies_linkedin(page.context.cookies())
                     _telegram("✅ <b>LinkedIn</b> : code accepté, connexion réussie !")
                     return True
                 _telegram("❌ <b>LinkedIn</b> : code refusé ou page inattendue")
