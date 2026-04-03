@@ -397,6 +397,7 @@ def _login(page) -> bool:
             _pause(2, 3)
             if any(x in page.url for x in ["feed", "mynetwork", "jobs"]) or page.locator("nav").count() > 0:
                 print("   ✅ LinkedIn connecté via cookies")
+                _telegram_screenshot(page, f"✅ Connecté via cookies — {page.url[:80]}")
                 return True
             print("   ⚠️  Cookies expirés, reconnexion par email/password")
 
