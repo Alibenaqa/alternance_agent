@@ -77,28 +77,32 @@ def get_screenshot() -> bytes | None:
 # VERIFICATION CODE (LinkedIn 2FA)
 # ─────────────────────────────────────────────────────
 
+import threading as _threading
 _verification_code: str | None = None
+_verification_event = _threading.Event()
 
 def set_linkedin_code(code: str):
     global _verification_code
     _verification_code = code
+    _verification_event.set()
 
-def _attendre_code_verification(timeout: int = 300) -> str | None:
-    """Attend que l'utilisateur envoie /linkedin_code via Telegram (max 5 min)."""
+def _attendre_code_verification(timeout: int = 600) -> str | None:
+    """Attend que l'utilisateur envoie /linkedin_code via Telegram (max 10 min)."""
     global _verification_code
+    # Reset AVANT d'envoyer le message (évite d'effacer un code arrivé trop vite)
     _verification_code = None
+    _verification_event.clear()
     _telegram(
         "🔐 <b>LinkedIn demande un code de vérification</b>\n"
         "Vérifie ton email et envoie :\n"
-        "<code>/linkedin_code XXXXXX</code>"
+        "<code>/linkedin_code XXXXXX</code>\n"
+        "<i>(tu as 10 minutes)</i>"
     )
-    start = time.time()
-    while time.time() - start < timeout:
-        if _verification_code:
-            code = _verification_code
-            _verification_code = None
-            return code
-        time.sleep(2)
+    if _verification_event.wait(timeout=timeout):
+        code = _verification_code
+        _verification_code = None
+        _verification_event.clear()
+        return code
     return None
 
 # ─────────────────────────────────────────────────────
@@ -422,7 +426,7 @@ def _soumettre_code(page) -> bool:
     """Attend le code de l'utilisateur via Telegram et le soumet."""
     from turso_sync import sauvegarder_cookies_linkedin
     _telegram_screenshot(page, "🔐 LinkedIn demande un code de vérification")
-    code = _attendre_code_verification(timeout=300)
+    code = _attendre_code_verification(timeout=600)
     if not code:
         _telegram("⏱️ <b>LinkedIn</b> : délai expiré — session annulée. Renvoie /linkedin_session et envoie vite le code.")
         return False
