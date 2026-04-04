@@ -620,14 +620,15 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
         page.goto(profil_url, timeout=20000)
         _pause_humaine()
 
-        # Debug: dump les boutons du profil pour identifier le bon sélecteur
+        # Screenshot + dump boutons → Telegram pour identifier le bon sélecteur
+        _telegram_screenshot(page, f"🔍 Profil chargé: {profil_url.split('/in/')[-1][:40]}")
         btn_labels = page.evaluate("""() => {
             return [...document.querySelectorAll('button')]
                 .map(b => b.getAttribute('aria-label') || b.innerText.trim())
                 .filter(t => t && t.length < 80 && t.length > 1)
                 .slice(0, 20).join(' | ');
         }""")
-        print(f"   🔍 Boutons profil: {btn_labels[:200]}")
+        _telegram(f"🔍 Boutons profil:\n{btn_labels[:400]}")
 
         # Cherche le bouton "Se connecter" / "Connect"
         btn_connect = page.locator(
@@ -1355,10 +1356,10 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             if not nom or not href:
                 continue
 
-            # Filtre : seulement data/tech/RH
+            # Classifie mais n'exclut plus "autre" — poste souvent vide donc on envoie à tous
             type_profil = _classifier_profil(poste)
             if type_profil == "autre":
-                continue
+                type_profil = "data_tech"  # template networking générique
 
             dm = _generer_dm(prenom, poste, "", type_profil)
             if not dm:
