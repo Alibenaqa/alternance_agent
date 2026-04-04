@@ -697,32 +697,40 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
         if connect_idx >= len(all_els):
             _log(f"   ⏭️  Index hors limite")
             return False
-        all_els[connect_idx].click()
-        _pause(1, 2)
+        all_els[connect_idx].click(timeout=5000)
+        _pause(1.5, 2)
 
-        # Ajouter une note personnalisée
-        btn_note = page.locator(
-            "button:has-text('Ajouter une note'), button:has-text('Add a note')"
-        ).first
-        if btn_note.is_visible():
-            btn_note.click()
-            _pause(0.8, 1.5)
-            textarea = page.locator("textarea[name='message'], textarea[id*='custom-message']").first
-            if textarea.is_visible():
-                textarea.fill(note)
-                _pause(0.5, 1)
+        # Vérifie si LinkedIn a directement envoyé (bouton disparu = succès immédiat)
+        # ou si une modale est apparue
+        # JS : cherche un bouton "Envoyer"/"Send" dans la page
+        send_idx = page.evaluate("""() => {
+            const keywords = ['envoyer', 'send', 'submit', 'sans note', 'without note'];
+            const btns = [...document.querySelectorAll('button')];
+            for (let i = 0; i < btns.length; i++) {
+                const t = (btns[i].getAttribute('aria-label') || btns[i].innerText || '').toLowerCase().trim();
+                if (keywords.some(kw => t === kw || t.includes(kw))) return i;
+            }
+            return -1;
+        }""")
 
-        # Envoyer
-        btn_envoyer = page.locator(
-            "button:has-text('Envoyer'), button:has-text('Send'), "
-            "button[aria-label*='Envoyer'], button[aria-label*='Send invitation']"
-        ).first
-        if btn_envoyer.is_visible():
-            btn_envoyer.click()
-            _pause(1, 2)
-            return True
+        if send_idx >= 0:
+            # Modale ouverte → clic sur Envoyer
+            btns = page.locator("button").all()
+            if send_idx < len(btns):
+                btns[send_idx].click(timeout=3000)
+                _pause(1, 2)
+                return True
 
-        return False
+        # Vérifie si la connexion a été envoyée directement (le bouton Connect a disparu)
+        still_connect = page.evaluate("""() => {
+            const texts = ['se connecter', 'connect', 'inviter'];
+            return [...document.querySelectorAll('button, a')].some(e => {
+                const t = (e.getAttribute('aria-label') || e.innerText || '').toLowerCase().trim();
+                return texts.some(kw => t === kw);
+            });
+        }""")
+        # Si le bouton Connect a disparu → connexion envoyée
+        return not still_connect
 
     except Exception as e:
         _log(f"   ❌ Erreur connexion : {e}")
