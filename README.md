@@ -33,15 +33,16 @@ main.py
 ├── 8 Scrapers → SQLite (memory.py)
 ├── Scorer Claude Haiku → score 0.0–1.0
 ├── Alertes Telegram immédiates (offres >90%)
-├── Candidatures auto (email Hunter.io + formulaire WTTJ + LinkedIn Easy Apply)
+├── Candidatures auto (email domain-guess + formulaire WTTJ + LinkedIn Easy Apply)
 ├── Suivi réponses Gmail → analyse Claude → relances auto
 ├── Calendrier iCloud (entretiens → événement + rappel)
-├── Alumni Hetic (DuckDuckGo → Hunter.io → email Claude)
+├── Alumni Hetic (DuckDuckGo → email domain-guess + Claude)
+├── LinkedIn Agent (connexions, likes, commentaires, DMs — sessions autonomes)
 ├── Turso sync (persistance cloud entre redéploiements)
 └── Dashboard Flask (auto-refresh 30s)
 ```
 
-**Cycle automatique toutes les 8h :**
+**Cycle automatique toutes les 4h :**
 1. Restauration des candidatures depuis Turso (anti-doublon après redéploiement)
 2. Scraping des 8 sources
 3. Scoring Claude Haiku

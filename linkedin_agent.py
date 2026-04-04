@@ -714,10 +714,22 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
 
         random.shuffle(candidats)
         for c in candidats[:max_profils * 2]:
-            nom = c["nom"]
             href = c["href"]
             if not href.startswith("http"):
                 href = "https://www.linkedin.com" + href
+
+            # Essaie de récupérer le vrai nom depuis les spans aria-hidden proches
+            nom = c["nom"]
+            if not nom or len(nom) < 3:
+                try:
+                    lien_el = page.locator(f"a[href*='{href.split('/in/')[1].split('/')[0]}'] span[aria-hidden='true']").first
+                    if lien_el.count():
+                        nom = lien_el.inner_text().strip()
+                except Exception:
+                    pass
+
+            if not nom or len(nom) < 3:
+                continue
 
             profils.append({
                 "nom": nom,
@@ -750,6 +762,7 @@ def run_connexions(page, nb_connexions: int) -> int:
 
         print(f"   🔍 Recherche : '{query}'")
         profils = _chercher_profils(page, query, max_profils=3)
+        _telegram(f"🔍 '{query}' → {len(profils)} profils : {[p['nom'] for p in profils]}")
 
         for profil in profils:
             if envoyes >= nb_connexions:
@@ -962,39 +975,44 @@ def run_likes(page, nb_likes: int) -> int:
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
-        articles = page.locator("div[data-urn*='activity'], div[class*='feed-shared-update'], div[class*='occludable-update']").all()
-        if not articles:
-            articles = page.locator("div[class*='fie-impression-container']").all()
-        random.shuffle(articles)
-        likes = 0
+        _telegram_screenshot(page, f"🔍 Feed après scroll — {page.url[:60]}")
 
-        for article in articles:
+        # Debug : log tous les aria-labels de boutons visibles
+        all_btns = page.locator("button[aria-label]").all()
+        labels = []
+        for b in all_btns[:20]:
+            try:
+                lbl = b.get_attribute("aria-label") or ""
+                if lbl:
+                    labels.append(lbl[:40])
+            except Exception:
+                pass
+        print(f"   🔍 Boutons aria-label trouvés : {labels}")
+        if labels:
+            _telegram(f"🔍 Boutons feed : {', '.join(labels[:10])}")
+
+        likes = 0
+        # Cherche directement tous les boutons Like/Réagir sur la page
+        btns_like = page.locator(
+            "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], "
+            "button[aria-label*='like'], button[aria-label*=\"j'aime\"], "
+            "button[aria-label*='Réagir'], button[aria-label*='React']"
+        ).all()
+        print(f"   👍 {len(btns_like)} boutons Like trouvés")
+
+        for btn in btns_like:
             if likes >= nb_likes:
                 break
             try:
-                contenu_el = article.locator("div[class*='commentary'] span[dir='ltr'], span[dir='ltr']").first
-                contenu = contenu_el.inner_text().strip() if contenu_el.count() else ""
-
-                if not contenu or not _evaluer_post(contenu):
+                if not btn.is_visible():
                     continue
-
-                # Cherche le bouton Like (pas déjà liké)
-                btn_like = article.locator(
-                    "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], button[aria-label*='like']"
-                ).first
-                if not btn_like.is_visible():
-                    continue
-
-                # Vérifie qu'il n'est pas déjà liké
-                aria = btn_like.get_attribute("aria-pressed") or ""
+                aria = btn.get_attribute("aria-pressed") or ""
                 if aria == "true":
                     continue
-
-                btn_like.click()
+                btn.click()
                 likes += 1
                 print(f"   👍 Post liké ({likes}/{nb_likes})")
-                _pause(3, 8)  # pause humaine entre likes
-
+                _pause(3, 8)
             except Exception:
                 continue
 
