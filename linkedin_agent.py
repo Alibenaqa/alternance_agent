@@ -535,11 +535,20 @@ def _login(page) -> bool:
             pass
         _pause(2, 3)
 
-        page.click("#username")
-        page.type("#username", LINKEDIN_EMAIL, delay=random.randint(50, 110))
+        SEL_EMAIL = "#username, input[name='session_key'], input[autocomplete='username'], input[type='email'], input[name='email']"
+        SEL_PASS  = "#password, input[name='session_password'], input[autocomplete='current-password'], input[type='password']"
+        try:
+            page.wait_for_selector(SEL_EMAIL, timeout=10000)
+        except Exception:
+            _telegram_screenshot(page, f"❌ Champ email introuvable — {page.url[:80]}")
+            return False
+        email_field = page.locator(SEL_EMAIL).first
+        email_field.click()
+        email_field.type(LINKEDIN_EMAIL, delay=random.randint(50, 110))
         _pause(0.5, 1.5)
-        page.click("#password")
-        page.type("#password", LINKEDIN_PASSWORD, delay=random.randint(60, 130))
+        pass_field = page.locator(SEL_PASS).first
+        pass_field.click()
+        pass_field.type(LINKEDIN_PASSWORD, delay=random.randint(60, 130))
         _pause(0.5, 1.5)
         page.click("button[type='submit']")
         try:
