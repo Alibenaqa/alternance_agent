@@ -903,44 +903,20 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     try:
         page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=20000)
 
-        # Attend que React ait rendu au moins un élément du feed
-        try:
-            page.wait_for_selector(
-                "div[data-id], article, .feed-shared-update-v2, div[data-urn]",
-                timeout=8000
-            )
-        except Exception:
-            pass  # continue quand même si timeout
+        _pause(3, 4)
 
-        _pause(2, 3)
-
-        # 4 scrolls pour charger plus de posts
-        for _ in range(4):
+        # 2 scrolls légers pour charger quelques posts (pas plus → RAM)
+        for _ in range(2):
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1, 1.5)
 
-        # Debug DOM : comprendre ce qui est rendu
-        dom_debug = page.evaluate("""() => ({
-            spanLtr: document.querySelectorAll('span[dir="ltr"]').length,
-            spanAuto: document.querySelectorAll('span[dir="auto"]').length,
-            divLtr: document.querySelectorAll('div[dir="ltr"]').length,
-            dataUrn: document.querySelectorAll('[data-urn]').length,
-            articles: document.querySelectorAll('article').length,
-            sampleText: [...document.querySelectorAll('span[dir="ltr"], span[dir="auto"]')]
-                .map(s => s.innerText.trim().slice(0, 60))
-                .filter(t => t.length > 30)
-                .slice(0, 3),
-        })""")
-        _log(f"   📰 DOM feed — span[ltr]:{dom_debug['spanLtr']} span[auto]:{dom_debug['spanAuto']} div[ltr]:{dom_debug['divLtr']} [data-urn]:{dom_debug['dataUrn']} articles:{dom_debug['articles']}")
-        _log(f"   📰 Exemples texte : {dom_debug['sampleText']}")
-
-        # Approche JS directe : span[dir=ltr] ou span[dir=auto] > 80 chars
+        # Approche JS directe : div[dir=ltr] > 80 chars (LinkedIn a changé span → div)
         raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
             const seenText = new Set();
 
-            // Tous les spans avec du texte long = textes de posts (ltr ou auto)
-            const textSpans = [...document.querySelectorAll('span[dir="ltr"], span[dir="auto"]')]
+            // LinkedIn utilise div[dir="ltr"] pour le texte des posts
+            const textSpans = [...document.querySelectorAll('div[dir="ltr"]')]
                 .filter(s => s.innerText.trim().length > 80);
 
             for (const span of textSpans) {
