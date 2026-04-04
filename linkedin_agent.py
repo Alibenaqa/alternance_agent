@@ -442,6 +442,24 @@ def _est_verification(page) -> bool:
 def _soumettre_code(page) -> bool:
     """Attend le code de l'utilisateur via Telegram et le soumet."""
     from turso_sync import sauvegarder_cookies_linkedin
+
+    # Détecte vérification par app push (pas de champ code)
+    app_check = (
+        page.locator("text=Consultez votre appli, text=Check your LinkedIn app, text=appli LinkedIn").count() > 0
+        or page.locator("button:has-text('Envoyer à nouveau'), button:has-text('Resend')").count() > 0
+    )
+    if app_check:
+        _telegram_screenshot(page, "📱 <b>LinkedIn demande une vérification via l'app</b>\nOuvre l'app LinkedIn sur ton tel et appuie sur <b>Oui</b>. Je patiente 3 minutes...")
+        # Attendre que LinkedIn valide la notification push (max 3 min)
+        for _ in range(36):
+            time.sleep(5)
+            if _est_connecte(page):
+                sauvegarder_cookies_linkedin(page.context.cookies())
+                _telegram("✅ Vérification app acceptée — connecté !")
+                return True
+        _telegram("⏱️ Vérification app expirée. Relance /linkedin_session et appuie vite sur Oui dans l'app.")
+        return False
+
     _telegram_screenshot(page, "🔐 LinkedIn demande un code de vérification")
     code = _attendre_code_verification(timeout=600)
     if not code:
