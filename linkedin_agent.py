@@ -833,49 +833,53 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1.5, 2.5)
 
-        # Approche JS : part des liens de posts (timestamps), remonte pour trouver auteur + texte
+        # Approche JS directe : part des textes longs (span[dir=ltr]) qui sont les posts,
+        # remonte pour trouver l'auteur. Pas de dépendance aux URLs de posts.
         raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
-            const seen = new Set();
+            const seenText = new Set();
 
-            // LinkedIn post URLs : /posts/ ou /feed/update/
-            const postLinks = [...document.querySelectorAll(
-                'a[href*="/posts/"], a[href*="/feed/update/"]'
-            )];
+            // Tous les spans avec du texte long = textes de posts
+            const textSpans = [...document.querySelectorAll('span[dir="ltr"]')]
+                .filter(s => s.innerText.trim().length > 80);
 
-            for (const postLink of postLinks) {
+            for (const span of textSpans) {
                 if (results.length >= maxPosts) break;
-                const url = postLink.href;
-                if (!url || seen.has(url)) continue;
-                // Ignore les liens courts (nav, sidebar)
-                if (!url.includes('activity') && !url.match(/posts[/].{10}/)) continue;
+                const contenu = span.innerText.trim();
+                if (seenText.has(contenu.slice(0, 50))) continue;
 
-                // Remonte pour trouver le conteneur qui a du texte ET un auteur
-                let container = postLink.parentElement;
+                // Remonte pour trouver un auteur (lien /in/)
+                let container = span.parentElement;
+                let auteur = '';
+                let url = '';
                 for (let d = 0; d < 15; d++) {
                     if (!container || container.tagName === 'BODY') break;
-
-                    const textEl = [...container.querySelectorAll('span[dir="ltr"]')]
-                        .find(s => s.innerText.trim().length > 60);
-                    const authorLink = container.querySelector('a[href*="/in/"]');
-
-                    if (textEl && authorLink) {
-                        const contenu = textEl.innerText.trim();
-                        const authorName = authorLink.querySelector('span[aria-hidden="true"]')
-                            ?.innerText?.trim()
-                            || authorLink.innerText.split('\\n')[0].trim();
-                        if (contenu.length > 60 && authorName.length > 1) {
-                            seen.add(url);
-                            results.push({
-                                auteur: authorName,
-                                titre_auteur: '',
-                                contenu: contenu.slice(0, 600),
-                                url: url,
-                            });
+                    if (!auteur) {
+                        const authorLink = container.querySelector('a[href*="/in/"]');
+                        if (authorLink) {
+                            auteur = authorLink.querySelector('span[aria-hidden="true"]')
+                                ?.innerText?.trim()
+                                || authorLink.innerText.split('\\n')[0].trim();
                         }
-                        break;
                     }
+                    if (!url) {
+                        const postLink = container.querySelector(
+                            'a[href*="/feed/update/"], a[href*="/posts/"]'
+                        );
+                        if (postLink) url = postLink.href;
+                    }
+                    if (auteur) break;
                     container = container.parentElement;
+                }
+
+                if (auteur && contenu.length > 80) {
+                    seenText.add(contenu.slice(0, 50));
+                    results.push({
+                        auteur: auteur,
+                        titre_auteur: '',
+                        contenu: contenu.slice(0, 600),
+                        url: url || '',
+                    });
                 }
             }
             return results;
