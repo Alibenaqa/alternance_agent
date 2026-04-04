@@ -679,56 +679,55 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
     try:
         url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&network=%5B%22S%22%2C%22O%22%5D"
         page.goto(url, timeout=20000)
-        page.wait_for_load_state("networkidle", timeout=10000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
         _pause_humaine()
 
-        # Sélecteurs modernes LinkedIn 2024-2026
-        cards = page.locator("li[class*='result-container'], li[class*='search-result']").all()
-        if not cards:
-            cards = page.locator("div[class*='entity-result']").all()
-        if not cards:
-            cards = page.locator("ul.reusable-search__entity-result-list > li").all()
-        if not cards:
-            cards = page.locator("div[data-view-name='search-entity-result-universal-template']").all()
-        print(f"   🔍 '{query}' → {len(cards)} cards trouvées — URL: {page.url[:80]}")
-        if not cards:
-            _telegram_screenshot(page, f"⚠️ Aucun résultat de recherche — '{query[:40]}'")
-        random.shuffle(cards)
-
-        for card in cards[:max_profils * 2]:
+        # Approche directe : récupère tous les liens /in/ visibles sur la page
+        liens = page.locator("a[href*='/in/']").all()
+        vus = set()
+        candidats = []
+        for lien_el in liens:
             try:
-                # Nom : aria-hidden spans dans les liens de profil
-                nom_el = card.locator("span[aria-hidden='true']").first
-                nom = nom_el.inner_text().strip() if nom_el.count() else ""
-
-                # Lien profil
-                lien_el = card.locator("a[href*='/in/']").first
-                lien = lien_el.get_attribute("href") if lien_el.count() else ""
-
-                # Poste et entreprise : les subtitles
-                subtitles = card.locator("div[class*='subtitle'], div[class*='primary-subtitle'], div[class*='secondary-subtitle']").all()
-                poste = subtitles[0].inner_text().strip() if len(subtitles) > 0 else ""
-                entreprise = subtitles[1].inner_text().strip() if len(subtitles) > 1 else ""
-
-                if not nom or not lien:
+                href = lien_el.get_attribute("href") or ""
+                href = href.split("?")[0]
+                if not href or href in vus:
                     continue
-
-                # Filtre : déjà connecté 1er degré
-                if card.locator("span:has-text('1er'), span:has-text('1st'), span:has-text('• 1st')").count() > 0:
+                # Exclure les liens "vous" / profil propre
+                if "linkedin.com/in/" not in href and not href.startswith("/in/"):
                     continue
-
-                profils.append({
-                    "nom": nom,
-                    "prenom": nom.split()[0] if nom else "",
-                    "poste": poste,
-                    "entreprise": entreprise,
-                    "url": lien.split("?")[0],
-                })
-
-                if len(profils) >= max_profils:
-                    break
+                vus.add(href)
+                # Récupère le texte du lien (souvent le nom)
+                texte = lien_el.inner_text().strip()
+                if not texte or len(texte) < 3:
+                    continue
+                candidats.append({"href": href, "nom": texte})
             except Exception:
                 continue
+
+        print(f"   🔍 '{query}' → {len(candidats)} profils trouvés — URL: {page.url[:80]}")
+        if not candidats:
+            _telegram_screenshot(page, f"⚠️ Aucun profil trouvé pour '{query[:40]}'")
+            return profils
+
+        random.shuffle(candidats)
+        for c in candidats[:max_profils * 2]:
+            nom = c["nom"]
+            href = c["href"]
+            if not href.startswith("http"):
+                href = "https://www.linkedin.com" + href
+
+            profils.append({
+                "nom": nom,
+                "prenom": nom.split()[0] if nom else "",
+                "poste": "",
+                "entreprise": "",
+                "url": href,
+            })
+            if len(profils) >= max_profils:
+                break
 
     except Exception as e:
         print(f"   ❌ Recherche profils : {e}")
