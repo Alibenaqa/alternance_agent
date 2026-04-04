@@ -620,11 +620,21 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
         page.goto(profil_url, timeout=20000)
         _pause_humaine()
 
+        # Debug: dump les boutons du profil pour identifier le bon sélecteur
+        btn_labels = page.evaluate("""() => {
+            return [...document.querySelectorAll('button')]
+                .map(b => b.getAttribute('aria-label') || b.innerText.trim())
+                .filter(t => t && t.length < 80 && t.length > 1)
+                .slice(0, 20).join(' | ');
+        }""")
+        print(f"   🔍 Boutons profil: {btn_labels[:200]}")
+
         # Cherche le bouton "Se connecter" / "Connect"
         btn_connect = page.locator(
             "button:has-text('Se connecter'), button:has-text('Connect'), "
             "button[aria-label*='Connect'], button[aria-label*='Se connecter'], "
-            "button[aria-label*='Inviter'], button[aria-label*='Invite']"
+            "button[aria-label*='Inviter'], button[aria-label*='Invite'], "
+            "button[aria-label*='connecter']"
         ).first
 
         if not btn_connect.is_visible():
@@ -824,10 +834,24 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1.5, 2.5)
 
+        # Debug: compter les articles avec différents sélecteurs
+        counts = page.evaluate("""() => {
+            return {
+                activity: document.querySelectorAll('div[data-urn*="activity"]').length,
+                feedShared: document.querySelectorAll('div[class*="feed-shared-update"]').length,
+                occludable: document.querySelectorAll('div[class*="occludable-update"]').length,
+                article: document.querySelectorAll('article').length,
+                dataId: document.querySelectorAll('[data-id]').length,
+            };
+        }""")
+        _telegram(f"🔍 Articles feed: activity={counts['activity']} feed-shared={counts['feedShared']} occludable={counts['occludable']} article={counts['article']} data-id={counts['dataId']}")
+
         # Sélecteurs modernes LinkedIn 2024-2026
         articles = page.locator("div[data-urn*='activity'], div[class*='feed-shared-update']").all()
         if not articles:
             articles = page.locator("div[class*='occludable-update']").all()
+        if not articles:
+            articles = page.locator("article").all()
 
         for article in articles[:max_posts * 2]:
             try:
@@ -883,6 +907,7 @@ def run_commentaires(page, nb_commentaires: int, app) -> int:
 
     print(f"\n💬 Commentaires LinkedIn — {nb_commentaires} cibles")
     posts = _scraper_feed(page, max_posts=15)
+    _telegram(f"🔍 Feed scrapé : {len(posts)} posts trouvés")
     random.shuffle(posts)
 
     envoyes = 0
@@ -975,17 +1000,32 @@ def run_likes(page, nb_likes: int) -> int:
     print(f"\n👍 Likes LinkedIn — {nb_likes} cibles")
     try:
         page.goto("https://www.linkedin.com/feed/", timeout=20000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
         _pause_humaine()
 
         for _ in range(4):
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
+        # Screenshot + dump des boutons pour voir ce que LinkedIn retourne réellement
+        _telegram_screenshot(page, f"🔍 Likes — feed chargé ({page.url[:60]})")
+        btn_debug = page.evaluate("""() => {
+            const btns = [...document.querySelectorAll('button')];
+            return btns.map(b => b.getAttribute('aria-label') || b.innerText.trim())
+                       .filter(t => t && t.length < 80 && t.length > 1)
+                       .slice(0, 25).join(' | ');
+        }""")
+        _telegram(f"🔍 Boutons page feed:\n{btn_debug[:400]}")
+
         likes = 0
         btns_like = page.locator(
             "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], "
             "button[aria-label*='like'], button[aria-label*=\"j'aime\"], "
-            "button[aria-label*='Réagir'], button[aria-label*='React']"
+            "button[aria-label*='Réagir'], button[aria-label*='React'], "
+            "button[aria-label*='réagir'], button[class*='react-button']"
         ).all()
         print(f"   👍 {len(btns_like)} boutons Like trouvés")
 
@@ -1261,9 +1301,24 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
     try:
         # Récupère les connexions récentes (invitations acceptées)
         page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", timeout=20000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
         _pause_humaine()
 
-        cards = page.locator("li.mn-connection-card").all()
+        # Screenshot + debug sélecteurs connexions
+        _telegram_screenshot(page, f"🔍 DMs — connexions ({page.url[:60]})")
+        card_debug = page.evaluate("""() => {
+            return {
+                mn: document.querySelectorAll('li.mn-connection-card').length,
+                connCard: document.querySelectorAll('[class*="connection-card"]').length,
+                liAll: document.querySelectorAll('li').length,
+            };
+        }""")
+        _telegram(f"🔍 Connexions: mn-connection-card={card_debug['mn']} *connection-card*={card_debug['connCard']} li total={card_debug['liAll']}")
+
+        cards = page.locator("li.mn-connection-card, li[class*='connection-card']").all()
         envoyes = 0
 
         for card in cards[:nb_dms * 2]:
