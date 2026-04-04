@@ -700,12 +700,15 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
                     continue
                 if "linkedin.com/in/" not in href and not href.startswith("/in/"):
                     continue
-                # Essaie de récupérer le nom : texte direct, puis span aria-hidden
-                nom = lien_el.inner_text().strip()
+                # Nom : préfère span[aria-hidden] (contient juste le nom)
+                nom = ""
+                span = lien_el.locator("span[aria-hidden='true']").first
+                if span.count():
+                    nom = span.inner_text().strip()
                 if not nom:
-                    span = lien_el.locator("span[aria-hidden='true']").first
-                    if span.count():
-                        nom = span.inner_text().strip()
+                    # Prend la première ligne du texte brut
+                    raw = lien_el.inner_text().strip()
+                    nom = raw.split("\n")[0].strip() if raw else ""
                 if not nom:
                     nom = href.split("/in/")[-1].strip("/").replace("-", " ").title()
                 vus.add(href)
