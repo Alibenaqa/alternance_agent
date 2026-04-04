@@ -637,23 +637,30 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
             pass
         _pause(2, 3)
 
-        # Cherche le bouton "Se connecter" / "Connect"
+        # Cherche le bouton/lien "Se connecter" / "Connect"
+        # LinkedIn utilise parfois <a> au lieu de <button>
         btn_connect = page.locator(
             "button:has-text('Se connecter'), button:has-text('Connect'), "
             "button[aria-label*='Connect'], button[aria-label*='Se connecter'], "
             "button[aria-label*='Inviter'], button[aria-label*='Invite'], "
-            "button[aria-label*='connecter']"
+            "button[aria-label*='connecter'], "
+            "a:has-text('Se connecter'), a:has-text('Connect')"
         ).first
 
         if not btn_connect.is_visible():
             # Parfois caché dans "Plus" / "More"
-            btn_plus = page.locator("button:has-text('Plus'), button:has-text('More')").first
+            btn_plus = page.locator(
+                "button:has-text('Plus'), button:has-text('More'), "
+                "a:has-text('Plus'), a:has-text('More')"
+            ).first
             if btn_plus.is_visible():
                 btn_plus.click()
                 _pause(1, 2)
                 btn_connect = page.locator(
                     "div[role='menuitem']:has-text('Se connecter'), "
-                    "div[role='menuitem']:has-text('Connect')"
+                    "div[role='menuitem']:has-text('Connect'), "
+                    "a[role='menuitem']:has-text('Connect'), "
+                    "li:has-text('Se connecter') a, li:has-text('Connect') a"
                 ).first
 
         if not btn_connect.is_visible():
