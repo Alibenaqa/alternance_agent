@@ -623,6 +623,22 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 16. Session bloquée 15+ minutes sur les connexions
+
+**Problème :** Avec 6 connexions, la session mettait plus de 15 minutes. Chaque profil accumulait : `about:blank` (1s) + `goto profil` (25s max) + `wait main` (8s) + pause (2-3s) + appel Claude pour la note (3-10s) + pause après (4-10s) + pause entre queries (5-12s) = ~50-60s par profil × 6 queries × 3 profils = ~15 min.
+
+**Solution :** Réduction de toutes les pauses :
+- Entre profils : 4-10s → 2-4s
+- Entre queries : 5-12s → 2-5s
+- Entre actions de session : 5-15s → 2-5s
+- Profils par query : 3 → 2
+- Timeout `wait_for_selector("main")` : 8s → 5s
+- Suppression du flush `about:blank` (économise 1-2s par profil)
+
+Résultat : session 6 connexions ~3-4 minutes au lieu de 15.
+
+---
+
 ### 15. Feed scrapé : 0 posts (liens /posts/ absents du DOM)
 
 **Problème :** Le scraper cherchait les liens `a[href*="/posts/"]` et `a[href*="/feed/update/"]` comme point de départ. Ces liens n'existent pas dans le DOM quand les ressources sont bloquées (images/media interceptés par `page.route()`).
