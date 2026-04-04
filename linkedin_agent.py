@@ -630,17 +630,12 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
         page.goto("about:blank", timeout=5000)
         _pause(0.5, 1)
         page.goto(profil_url, wait_until="domcontentloaded", timeout=25000)
-        _pause(2, 4)
-
-        # Screenshot + dump boutons → Telegram pour identifier le bon sélecteur
-        _telegram_screenshot(page, f"🔍 Profil chargé: {profil_url.split('/in/')[-1][:40]}")
-        btn_labels = page.evaluate("""() => {
-            return [...document.querySelectorAll('button')]
-                .map(b => b.getAttribute('aria-label') || b.innerText.trim())
-                .filter(t => t && t.length < 80 && t.length > 1)
-                .slice(0, 20).join(' | ');
-        }""")
-        _telegram(f"🔍 Boutons profil:\n{btn_labels[:400]}")
+        # Attend que le contenu React du profil soit rendu (section principale)
+        try:
+            page.wait_for_selector("main", timeout=8000)
+        except Exception:
+            pass
+        _pause(2, 3)
 
         # Cherche le bouton "Se connecter" / "Connect"
         btn_connect = page.locator(
