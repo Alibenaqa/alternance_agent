@@ -841,17 +841,13 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     """Scrape les posts du feed LinkedIn via JS pour éviter la dépendance aux classes CSS."""
     posts = []
     try:
-        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=25000)
-        try:
-            page.wait_for_selector("span[dir='ltr']", timeout=8000)
-        except Exception:
-            pass
-        _pause(2, 3)
+        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=20000)
+        _pause(3, 4)
 
-        # Scroll pour charger plus de posts
-        for _ in range(5):
+        # 2 scrolls rapides pour charger quelques posts
+        for _ in range(2):
             page.evaluate("window.scrollBy(0, 800)")
-            _pause(1.5, 2.5)
+            _pause(1, 1.5)
 
         # Approche JS directe : part des textes longs (span[dir=ltr]) qui sont les posts,
         # remonte pour trouver l'auteur. Pas de dépendance aux URLs de posts.
@@ -1544,10 +1540,10 @@ def run_linkedin_session(app=None) -> dict:
         return {"connexions": 0, "commentaires": 0}
 
     # Mix aléatoire du jour
-    nb_connexions   = random.randint(0, 8)
-    nb_commentaires = random.randint(0, 4)
-    nb_likes        = random.randint(0, 5)
-    nb_dms          = random.randint(0, 3)
+    nb_connexions   = random.randint(2, 5)
+    nb_commentaires = random.randint(0, 2)
+    nb_likes        = random.randint(1, 4)
+    nb_dms          = random.randint(0, 2)
     faire_messages  = random.choice([True, False])  # messages reçus : 1 session sur 2
     faire_visites   = random.choice([True, False])  # visites profils : 1 session sur 2
 
