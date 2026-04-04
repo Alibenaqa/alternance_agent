@@ -627,44 +627,72 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
     """Ouvre un profil LinkedIn et envoie une demande de connexion avec note."""
     try:
         page.goto(profil_url, wait_until="domcontentloaded", timeout=20000)
+        # Attend que la section actions du profil soit rendue (boutons Connect/Message)
         try:
-            page.wait_for_selector("main", timeout=5000)
+            page.wait_for_selector(
+                "button:has-text('Connect'), button:has-text('Se connecter'), "
+                "button:has-text('Message'), button:has-text('Follow'), "
+                "a:has-text('Connect'), a:has-text('Se connecter')",
+                timeout=6000
+            )
         except Exception:
             pass
         _pause(1, 2)
 
-        # Cherche le bouton/lien "Se connecter" / "Connect"
-        # LinkedIn utilise parfois <a> au lieu de <button>
-        btn_connect = page.locator(
-            "button:has-text('Se connecter'), button:has-text('Connect'), "
-            "button[aria-label*='Connect'], button[aria-label*='Se connecter'], "
-            "button[aria-label*='Inviter'], button[aria-label*='Invite'], "
-            "button[aria-label*='connecter'], "
-            "a:has-text('Se connecter'), a:has-text('Connect')"
-        ).first
+        # Cherche le bouton/lien "Se connecter" / "Connect" via JS (plus fiable)
+        connect_idx = page.evaluate("""() => {
+            const texts = ['se connecter', 'connect', 'inviter', 'invite'];
+            const els = [...document.querySelectorAll('button, a')];
+            for (let i = 0; i < els.length; i++) {
+                const t = (els[i].getAttribute('aria-label') || els[i].innerText || '').toLowerCase().trim();
+                if (texts.some(kw => t === kw || t.startsWith(kw + ' '))) return i;
+            }
+            return -1;
+        }""")
 
-        if not btn_connect.is_visible():
-            # Parfois caché dans "Plus" / "More"
+        if connect_idx == -1:
+            # Essai dans le menu "Plus" / "More"
             btn_plus = page.locator(
                 "button:has-text('Plus'), button:has-text('More'), "
                 "a:has-text('Plus'), a:has-text('More')"
             ).first
             if btn_plus.is_visible():
                 btn_plus.click()
-                _pause(1, 2)
-                btn_connect = page.locator(
-                    "div[role='menuitem']:has-text('Se connecter'), "
-                    "div[role='menuitem']:has-text('Connect'), "
-                    "a[role='menuitem']:has-text('Connect'), "
-                    "li:has-text('Se connecter') a, li:has-text('Connect') a"
-                ).first
-
-        if not btn_connect.is_visible():
+                _pause(0.8, 1.5)
+                connect_idx = page.evaluate("""() => {
+                    const texts = ['se connecter', 'connect'];
+                    const els = [...document.querySelectorAll(
+                        'div[role="menuitem"], li[role="menuitem"], a[role="menuitem"]'
+                    )];
+                    for (let i = 0; i < els.length; i++) {
+                        const t = els[i].innerText.toLowerCase().trim();
+                        if (texts.some(kw => t === kw)) return i;
+                    }
+                    return -1;
+                }""")
+                if connect_idx >= 0:
+                    menuitems = page.locator('div[role="menuitem"], li[role="menuitem"], a[role="menuitem"]').all()
+                    if connect_idx < len(menuitems):
+                        menuitems[connect_idx].click()
+                        _pause(1, 2)
+                        # Envoyer sans note depuis le menu
+                        btn_envoyer = page.locator(
+                            "button:has-text('Envoyer'), button:has-text('Send'), "
+                            "button:has-text('Se connecter'), button:has-text('Connect')"
+                        ).first
+                        if btn_envoyer.is_visible():
+                            btn_envoyer.click()
+                            _pause(1, 2)
+                            return True
             _log(f"   ⏭️  Bouton connexion introuvable")
             return False
 
-        btn_connect.click()
-        _pause(1.5, 3)
+        all_els = page.locator("button, a").all()
+        if connect_idx >= len(all_els):
+            _log(f"   ⏭️  Index hors limite")
+            return False
+        all_els[connect_idx].click()
+        _pause(1, 2)
 
         # Ajouter une note personnalisée
         btn_note = page.locator(
@@ -814,7 +842,11 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     posts = []
     try:
         page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=25000)
-        _pause(3, 5)
+        try:
+            page.wait_for_selector("span[dir='ltr']", timeout=8000)
+        except Exception:
+            pass
+        _pause(2, 3)
 
         # Scroll pour charger plus de posts
         for _ in range(5):
@@ -1295,12 +1327,12 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
     print(f"\n💌 Messages directs — {nb_dms} cibles")
     try:
         # Récupère les connexions récentes via les liens /in/ (indépendant des classes CSS)
-        page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", timeout=20000)
+        page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", wait_until="domcontentloaded", timeout=20000)
         try:
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_selector("a[href*='/in/']", timeout=8000)
         except Exception:
             pass
-        _pause_humaine()
+        _pause(2, 3)
 
         # JS : extrait profils depuis liens /in/ sur la page connexions
         connexions = page.evaluate("""() => {
