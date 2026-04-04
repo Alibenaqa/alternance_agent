@@ -623,6 +623,17 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 24. Connexion envoyée mais retourne False (modale ou envoi direct)
+
+**Problème :** Après `connect_idx=14` (bouton trouvé, clic effectué), la fonction retournait False. LinkedIn a deux comportements : soit il ouvre une modale avec un bouton "Envoyer", soit il envoie directement sans modale. Le code cherchait `btn_envoyer.is_visible()` mais ne gérait pas l'envoi direct.
+
+**Solution :**
+1. Après le clic Connect, JS cherche un bouton "envoyer"/"send" dans la page
+2. Si trouvé → modale ouverte → clic sur Envoyer
+3. Sinon → vérifier si le bouton Connect a disparu de la page → si oui, connexion envoyée directement
+
+---
+
 ### 21. Likes : Target crashed après le 3e like
 
 **Problème :** Le JS évaluait les indices des boutons une seule fois au début. Après chaque like + pause (3-8s), le feed scrollait, de nouveaux boutons apparaissaient, les anciens indices devenaient invalides → `Target crashed` sur tous les boutons restants.
