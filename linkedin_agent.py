@@ -686,6 +686,13 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
         cards = page.locator("li[class*='result-container'], li[class*='search-result']").all()
         if not cards:
             cards = page.locator("div[class*='entity-result']").all()
+        if not cards:
+            cards = page.locator("ul.reusable-search__entity-result-list > li").all()
+        if not cards:
+            cards = page.locator("div[data-view-name='search-entity-result-universal-template']").all()
+        print(f"   🔍 '{query}' → {len(cards)} cards trouvées — URL: {page.url[:80]}")
+        if not cards:
+            _telegram_screenshot(page, f"⚠️ Aucun résultat de recherche — '{query[:40]}'")
         random.shuffle(cards)
 
         for card in cards[:max_profils * 2]:
