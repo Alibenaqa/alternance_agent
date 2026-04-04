@@ -685,6 +685,9 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
             pass
         _pause_humaine()
 
+        # Screenshot pour voir ce que la page de recherche affiche
+        _telegram_screenshot(page, f"🔍 Page recherche '{query[:30]}' — {page.url[:60]}")
+
         # Approche directe : récupère tous les liens /in/ visibles sur la page
         liens = page.locator("a[href*='/in/']").all()
         vus = set()
@@ -695,21 +698,24 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
                 href = href.split("?")[0]
                 if not href or href in vus:
                     continue
-                # Exclure les liens "vous" / profil propre
                 if "linkedin.com/in/" not in href and not href.startswith("/in/"):
                     continue
+                # Essaie de récupérer le nom : texte direct, puis span aria-hidden
+                nom = lien_el.inner_text().strip()
+                if not nom:
+                    span = lien_el.locator("span[aria-hidden='true']").first
+                    if span.count():
+                        nom = span.inner_text().strip()
+                if not nom:
+                    nom = href.split("/in/")[-1].strip("/").replace("-", " ").title()
                 vus.add(href)
-                # Récupère le texte du lien (souvent le nom)
-                texte = lien_el.inner_text().strip()
-                if not texte or len(texte) < 3:
-                    continue
-                candidats.append({"href": href, "nom": texte})
+                candidats.append({"href": href, "nom": nom})
             except Exception:
                 continue
 
-        print(f"   🔍 '{query}' → {len(candidats)} profils trouvés — URL: {page.url[:80]}")
+        print(f"   🔍 '{query}' → {len(candidats)} liens /in/ — URL: {page.url[:80]}")
+        _telegram(f"🔍 '{query[:30]}' → {len(candidats)} liens trouvés : {[c['nom'][:20] for c in candidats[:5]]}")
         if not candidats:
-            _telegram_screenshot(page, f"⚠️ Aucun profil trouvé pour '{query[:40]}'")
             return profils
 
         random.shuffle(candidats)
@@ -718,7 +724,6 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
             if not href.startswith("http"):
                 href = "https://www.linkedin.com" + href
 
-            # Essaie de récupérer le vrai nom depuis les spans aria-hidden proches
             nom = c["nom"]
             if not nom or len(nom) < 3:
                 try:
