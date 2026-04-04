@@ -919,18 +919,28 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1, 1.5)
 
-        # Debug : compte total de spans avant filtre
-        total_spans = page.evaluate("""() => document.querySelectorAll('span[dir="ltr"]').length""")
-        _log(f"   📰 Total spans[dir=ltr] dans le DOM : {total_spans}")
+        # Debug DOM : comprendre ce qui est rendu
+        dom_debug = page.evaluate("""() => ({
+            spanLtr: document.querySelectorAll('span[dir="ltr"]').length,
+            spanAuto: document.querySelectorAll('span[dir="auto"]').length,
+            divLtr: document.querySelectorAll('div[dir="ltr"]').length,
+            dataUrn: document.querySelectorAll('[data-urn]').length,
+            articles: document.querySelectorAll('article').length,
+            sampleText: [...document.querySelectorAll('span[dir="ltr"], span[dir="auto"]')]
+                .map(s => s.innerText.trim().slice(0, 60))
+                .filter(t => t.length > 30)
+                .slice(0, 3),
+        })""")
+        _log(f"   📰 DOM feed — span[ltr]:{dom_debug['spanLtr']} span[auto]:{dom_debug['spanAuto']} div[ltr]:{dom_debug['divLtr']} [data-urn]:{dom_debug['dataUrn']} articles:{dom_debug['articles']}")
+        _log(f"   📰 Exemples texte : {dom_debug['sampleText']}")
 
-        # Approche JS directe : part des textes longs (span[dir=ltr]) qui sont les posts,
-        # remonte pour trouver l'auteur. Pas de dépendance aux URLs de posts.
+        # Approche JS directe : span[dir=ltr] ou span[dir=auto] > 80 chars
         raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
             const seenText = new Set();
 
-            // Tous les spans avec du texte long = textes de posts
-            const textSpans = [...document.querySelectorAll('span[dir="ltr"]')]
+            // Tous les spans avec du texte long = textes de posts (ltr ou auto)
+            const textSpans = [...document.querySelectorAll('span[dir="ltr"], span[dir="auto"]')]
                 .filter(s => s.innerText.trim().length > 80);
 
             for (const span of textSpans) {
@@ -1446,7 +1456,9 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             return results.slice(0, 20);
         }""")
 
-        _log(f"   💌 {len(connexions)} connexions trouvées sur la page")
+        # Debug : combien de liens /in/ bruts avant extraction des noms
+        raw_links_count = page.evaluate("""() => document.querySelectorAll('a[href*="/in/"]').length""")
+        _log(f"   💌 {raw_links_count} liens /in/ bruts — {len(connexions)} connexions extraites")
         envoyes = 0
 
         for conn in connexions:
