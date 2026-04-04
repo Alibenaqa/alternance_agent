@@ -821,74 +821,70 @@ def run_connexions(page, nb_connexions: int) -> int:
 # ─────────────────────────────────────────────────────
 
 def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
-    """Scrape les posts du feed LinkedIn."""
+    """Scrape les posts du feed LinkedIn via JS pour éviter la dépendance aux classes CSS."""
     posts = []
     try:
         page.goto("https://www.linkedin.com/feed/", timeout=20000)
-        page.wait_for_load_state("networkidle", timeout=10000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
         _pause_humaine()
-        _telegram_screenshot(page, f"🔍 Feed LinkedIn — URL: {page.url[:80]}")
 
         # Scroll pour charger plus de posts
-        for _ in range(4):
+        for _ in range(5):
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1.5, 2.5)
 
-        # Debug: compter les articles avec différents sélecteurs
-        counts = page.evaluate("""() => {
-            return {
-                activity: document.querySelectorAll('div[data-urn*="activity"]').length,
-                feedShared: document.querySelectorAll('div[class*="feed-shared-update"]').length,
-                occludable: document.querySelectorAll('div[class*="occludable-update"]').length,
-                article: document.querySelectorAll('article').length,
-                dataId: document.querySelectorAll('[data-id]').length,
-            };
-        }""")
-        _telegram(f"🔍 Articles feed: activity={counts['activity']} feed-shared={counts['feedShared']} occludable={counts['occludable']} article={counts['article']} data-id={counts['dataId']}")
+        # Approche JS : remonte depuis chaque lien /in/ pour trouver le post container,
+        # puis extrait le texte et l'URL du post. Ne dépend d'aucune classe CSS.
+        raw_posts = page.evaluate(f"""(maxPosts) => {{
+            const results = [];
+            const seen = new Set();
 
-        # Sélecteurs modernes LinkedIn 2024-2026
-        articles = page.locator("div[data-urn*='activity'], div[class*='feed-shared-update']").all()
-        if not articles:
-            articles = page.locator("div[class*='occludable-update']").all()
-        if not articles:
-            articles = page.locator("article").all()
+            // Trouve tous les liens vers des profils dans le feed
+            const profileLinks = [...document.querySelectorAll('a[href*="/in/"]')];
 
-        for article in articles[:max_posts * 2]:
-            try:
-                # Auteur : premier lien /in/ dans l'article
-                auteur_el = article.locator("a[href*='/in/'] span[aria-hidden='true']").first
-                if not auteur_el.count():
-                    auteur_el = article.locator("span[class*='actor__name']").first
-                auteur = auteur_el.inner_text().strip() if auteur_el.count() else "Inconnu"
+            for (const link of profileLinks) {{
+                if (results.length >= maxPosts) break;
+                const authorName = link.querySelector('span[aria-hidden="true"]')?.innerText?.trim() || '';
+                if (!authorName || authorName.length < 2) continue;
 
-                # Titre auteur
-                titre_el = article.locator("span[class*='actor__description'], span[class*='subtitle']").first
-                titre_auteur = titre_el.inner_text().strip() if titre_el.count() else ""
+                // Remonte dans le DOM pour trouver le conteneur du post
+                // (celui qui contient à la fois l'auteur ET du texte long)
+                let container = link.parentElement;
+                let found = false;
+                for (let depth = 0; depth < 12; depth++) {{
+                    if (!container) break;
+                    // Cherche du texte de post (span[dir=ltr] avec >50 chars)
+                    const textSpans = [...container.querySelectorAll('span[dir="ltr"]')]
+                        .filter(s => s.innerText.trim().length > 50);
+                    // Cherche un lien vers le post
+                    const postLink = container.querySelector('a[href*="/feed/update/"], a[href*="/posts/"]');
 
-                # Contenu : cherche le texte principal
-                contenu_el = article.locator("div[class*='commentary'] span[dir='ltr'], div[class*='update-components-text'] span[dir='ltr'], div[class*='feed-shared-text']").first
-                if not contenu_el.count():
-                    contenu_el = article.locator("span[dir='ltr']").first
-                contenu = contenu_el.inner_text().strip() if contenu_el.count() else ""
+                    if (textSpans.length > 0 && postLink) {{
+                        const contenu = textSpans[0].innerText.trim();
+                        const url = postLink.href;
+                        if (!seen.has(url) && contenu.length > 50) {{
+                            seen.add(url);
+                            results.push({{
+                                auteur: authorName,
+                                titre_auteur: '',
+                                contenu: contenu.slice(0, 600),
+                                url: url,
+                            }});
+                            found = true;
+                        }}
+                        break;
+                    }}
+                    container = container.parentElement;
+                }}
+            }}
+            return results;
+        }}, {max_posts}""")
 
-                if not contenu or len(contenu) < 50:
-                    continue
-
-                # URL du post
-                lien_el = article.locator("a[href*='/posts/'], a[href*='/feed/update/']").first
-                url_post = lien_el.get_attribute("href") if lien_el.count() else ""
-
-                posts.append({
-                    "auteur": auteur,
-                    "titre_auteur": titre_auteur,
-                    "contenu": contenu,
-                    "url": url_post,
-                })
-
-                if len(posts) >= max_posts:
-                    break
-            except Exception:
-                continue
+        posts = raw_posts if raw_posts else []
+        print(f"   📰 Feed scrapé : {len(posts)} posts")
 
     except Exception as e:
         print(f"   ❌ Scraping feed : {e}")
@@ -1010,33 +1006,41 @@ def run_likes(page, nb_likes: int) -> int:
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
-        # Screenshot + dump des boutons pour voir ce que LinkedIn retourne réellement
-        _telegram_screenshot(page, f"🔍 Likes — feed chargé ({page.url[:60]})")
-        btn_debug = page.evaluate("""() => {
-            const btns = [...document.querySelectorAll('button')];
-            return btns.map(b => b.getAttribute('aria-label') || b.innerText.trim())
-                       .filter(t => t && t.length < 80 && t.length > 1)
-                       .slice(0, 25).join(' | ');
+        # JS: trouve les boutons de réaction non encore cliqués (aria-pressed=false)
+        # et récupère leurs infos en un seul appel pour debug
+        btn_info = page.evaluate("""() => {
+            const all = [...document.querySelectorAll('button[aria-pressed]')];
+            return all.map(b => ({
+                label: b.getAttribute('aria-label') || b.innerText.trim().slice(0, 40),
+                pressed: b.getAttribute('aria-pressed'),
+            })).slice(0, 30);
         }""")
-        _telegram(f"🔍 Boutons page feed:\n{btn_debug[:400]}")
+        # Log les labels pour debug Railway
+        labels_str = " | ".join(f"{b['label']}({b['pressed']})" for b in btn_info[:15])
+        print(f"   🔍 Boutons aria-pressed: {labels_str[:300]}")
 
         likes = 0
-        btns_like = page.locator(
-            "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], "
-            "button[aria-label*='like'], button[aria-label*=\"j'aime\"], "
-            "button[aria-label*='Réagir'], button[aria-label*='React'], "
-            "button[aria-label*='réagir'], button[class*='react-button']"
-        ).all()
-        print(f"   👍 {len(btns_like)} boutons Like trouvés")
-
+        # Sélecteur large : tous les boutons avec aria-pressed=false (réactions non encore faites)
+        # LinkedIn utilise aria-pressed pour les boutons de réaction
+        btns_like = page.locator("button[aria-pressed='false']").all()
+        reaction_keywords = ["réagir", "react", "like", "j'aime", "aime", "recommande", "soutiens", "felicite", "adore", "interessant"]
+        filtered = []
         for btn in btns_like:
+            try:
+                label = (btn.get_attribute("aria-label") or "").lower()
+                if any(kw in label for kw in reaction_keywords):
+                    filtered.append(btn)
+            except Exception:
+                continue
+
+        print(f"   👍 {len(filtered)} boutons réaction trouvés (sur {len(btns_like)} aria-pressed=false)")
+        _telegram(f"👍 {len(filtered)} boutons réaction | {len(btns_like)} aria-pressed=false\nLabels: {labels_str[:200]}")
+
+        for btn in filtered:
             if likes >= nb_likes:
                 break
             try:
                 if not btn.is_visible():
-                    continue
-                aria = btn.get_attribute("aria-pressed") or ""
-                if aria == "true":
                     continue
                 btn.click()
                 likes += 1
@@ -1299,7 +1303,7 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
 
     print(f"\n💌 Messages directs — {nb_dms} cibles")
     try:
-        # Récupère les connexions récentes (invitations acceptées)
+        # Récupère les connexions récentes via les liens /in/ (indépendant des classes CSS)
         page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", timeout=20000)
         try:
             page.wait_for_load_state("networkidle", timeout=10000)
@@ -1307,63 +1311,79 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             pass
         _pause_humaine()
 
-        # Screenshot + debug sélecteurs connexions
-        _telegram_screenshot(page, f"🔍 DMs — connexions ({page.url[:60]})")
-        card_debug = page.evaluate("""() => {
-            return {
-                mn: document.querySelectorAll('li.mn-connection-card').length,
-                connCard: document.querySelectorAll('[class*="connection-card"]').length,
-                liAll: document.querySelectorAll('li').length,
-            };
+        # JS : extrait profils depuis liens /in/ sur la page connexions
+        connexions = page.evaluate("""() => {
+            const seen = new Set();
+            const results = [];
+            const links = [...document.querySelectorAll('a[href*="/in/"]')];
+            for (const link of links) {
+                const href = link.href.split('?')[0];
+                if (!href || seen.has(href)) continue;
+                seen.add(href);
+                // Nom : span[aria-hidden=true] ou premier texte
+                const nameEl = link.querySelector('span[aria-hidden="true"]');
+                const nom = nameEl ? nameEl.innerText.trim() : link.innerText.split('\\n')[0].trim();
+                if (!nom || nom.length < 2) continue;
+                // Poste : cherche dans les éléments frères ou parents proches
+                let poste = '';
+                let el = link.parentElement;
+                for (let i = 0; i < 5; i++) {
+                    if (!el) break;
+                    const spans = [...el.querySelectorAll('span, p')];
+                    for (const s of spans) {
+                        const t = s.innerText.trim();
+                        if (t.length > 5 && t.length < 80 && t !== nom && !t.includes('•')) {
+                            poste = t;
+                            break;
+                        }
+                    }
+                    if (poste) break;
+                    el = el.parentElement;
+                }
+                results.push({ href, nom, poste });
+            }
+            return results.slice(0, 20);
         }""")
-        _telegram(f"🔍 Connexions: mn-connection-card={card_debug['mn']} *connection-card*={card_debug['connCard']} li total={card_debug['liAll']}")
 
-        cards = page.locator("li.mn-connection-card, li[class*='connection-card']").all()
+        print(f"   💌 {len(connexions)} connexions trouvées sur la page")
         envoyes = 0
 
-        for card in cards[:nb_dms * 2]:
+        for conn in connexions:
             if envoyes >= nb_dms:
                 break
-            try:
-                nom_el = card.locator("span.mn-connection-card__name").first
-                poste_el = card.locator("span.mn-connection-card__occupation").first
-                lien_el = card.locator("a.mn-connection-card__link").first
 
-                nom = nom_el.inner_text().strip() if nom_el.count() else ""
-                poste = poste_el.inner_text().strip() if poste_el.count() else ""
-                url = lien_el.get_attribute("href") if lien_el.count() else ""
-                prenom = nom.split()[0] if nom else ""
+            nom = conn.get("nom", "")
+            poste = conn.get("poste", "")
+            href = conn.get("href", "")
+            prenom = nom.split()[0] if nom else ""
 
-                if not nom or not url:
-                    continue
-
-                # Filtre : seulement data/tech/RH
-                type_profil = _classifier_profil(poste)
-                if type_profil == "autre":
-                    continue
-
-                dm = _generer_dm(prenom, poste, "", type_profil)
-                if not dm:
-                    continue
-
-                cle = f"dm_{int(time.time())}_{envoyes}"
-                _dms_pending[cle] = {"dm": dm, "url": url, "nom": nom}
-
-                apercu = (
-                    f"💌 <b>DM proposé</b>\n\n"
-                    f"👤 {nom} — {poste}\n\n"
-                    f"✍️ <b>Message :</b>\n{dm}"
-                )
-                buttons = [[
-                    {"text": "✅ Envoyer", "callback_data": f"linkedin_dm_ok:{cle}"},
-                    {"text": "❌ Skip",    "callback_data": f"linkedin_dm_skip:{cle}"},
-                ]]
-                _telegram(apercu, buttons)
-                envoyes += 1
-                _pause(2, 4)
-
-            except Exception:
+            if not nom or not href:
                 continue
+
+            # Filtre : seulement data/tech/RH
+            type_profil = _classifier_profil(poste)
+            if type_profil == "autre":
+                continue
+
+            dm = _generer_dm(prenom, poste, "", type_profil)
+            if not dm:
+                continue
+
+            cle = f"dm_{int(time.time())}_{envoyes}"
+            _dms_pending[cle] = {"dm": dm, "url": href, "nom": nom}
+
+            apercu = (
+                f"💌 <b>DM proposé</b>\n\n"
+                f"👤 {nom} — {poste}\n\n"
+                f"✍️ <b>Message :</b>\n{dm}"
+            )
+            buttons = [[
+                {"text": "✅ Envoyer", "callback_data": f"linkedin_dm_ok:{cle}"},
+                {"text": "❌ Skip",    "callback_data": f"linkedin_dm_skip:{cle}"},
+            ]]
+            _telegram(apercu, buttons)
+            envoyes += 1
+            _pause(2, 4)
 
         print(f"   ✅ {envoyes} DMs proposés sur Telegram")
         return envoyes
