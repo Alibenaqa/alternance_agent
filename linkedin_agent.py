@@ -46,16 +46,16 @@ MAX_COMMENTAIRES_JOUR = 6
 
 # Profils cibles pour les connexions
 RECHERCHES_CONNEXION = [
-    "Data Analyst France",
-    "Data Scientist Paris",
-    "Data Engineer France",
-    "Machine Learning Engineer France",
-    "DevOps Engineer Paris",
-    "AI Engineer France",
-    "Recruteur IT Paris",
-    "Talent Acquisition data tech",
-    "Business Intelligence Analyst France",
-    "MLOps Engineer France",
+    "Data Analyst",
+    "Data Engineer",
+    "Data Scientist",
+    "Software Engineer",
+    "Développeur Python",
+    "Machine Learning",
+    "Recruteur tech",
+    "BI Analyst",
+    "AI Engineer",
+    "MLOps",
 ]
 
 NOTE_MAX_CHARS = 300  # LinkedIn limite les notes de connexion
@@ -700,17 +700,16 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
                     continue
                 if "linkedin.com/in/" not in href and not href.startswith("/in/"):
                     continue
-                # Nom : préfère span[aria-hidden] (contient juste le nom)
+                # Nom : première ligne non vide, max 40 chars
                 nom = ""
-                span = lien_el.locator("span[aria-hidden='true']").first
-                if span.count():
-                    nom = span.inner_text().strip()
+                raw = lien_el.inner_text().strip()
+                for ligne in raw.split("\n"):
+                    ligne = ligne.strip()
+                    if ligne and len(ligne) > 2 and "•" not in ligne and "Connect" not in ligne:
+                        nom = ligne[:40]
+                        break
                 if not nom:
-                    # Prend la première ligne du texte brut
-                    raw = lien_el.inner_text().strip()
-                    nom = raw.split("\n")[0].strip() if raw else ""
-                if not nom:
-                    nom = href.split("/in/")[-1].strip("/").replace("-", " ").title()
+                    nom = href.split("/in/")[-1].strip("/").replace("-", " ").title()[:40]
                 vus.add(href)
                 candidats.append({"href": href, "nom": nom})
             except Exception:
