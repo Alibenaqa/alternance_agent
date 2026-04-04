@@ -623,6 +623,17 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 20. Session bloquée sur commentaires (feed trop lent)
+
+**Problème :** `_scraper_feed` accumulait : 8s `wait_for_selector` + 5 scrolls × 1.5-2.5s = jusqu'à 20s juste pour charger le feed. Avec 4 commentaires max et les appels Claude, la session pouvait rester bloquée 15+ minutes.
+
+**Solution :**
+- Réduire à 2 scrolls × 1-1.5s
+- Supprimer le `wait_for_selector` (ajouter un simple `_pause(3,4)` à la place)
+- Plafonner les valeurs aléatoires de session : connexions 2-5, commentaires 0-2, likes 1-4, DMs 0-2
+
+---
+
 ### 17. Bouton Connect introuvable (sélecteur CSS vs JS)
 
 **Problème :** `page.locator("button:has-text('Connect')")` retournait un locator vide même quand le bouton était visible dans le screenshot. Résidu de l'ancien `btn_connect.click()` après la réécriture.
