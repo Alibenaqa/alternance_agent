@@ -404,6 +404,10 @@ def _launch_browser(playwright):
             "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
             "--no-zygote", "--disable-setuid-sandbox",
             "--disable-blink-features=AutomationControlled",
+            "--disable-extensions", "--disable-plugins",
+            "--js-flags=--max-old-space-size=256",
+            "--memory-pressure-off",
+            "--single-process",
         ],
     )
     ctx = browser.new_context(
@@ -1586,8 +1590,22 @@ def run_linkedin_session(app=None) -> dict:
         if nb_dms > 0:          todo.append("dms")
         random.shuffle(todo)
 
+        def _fresh_page():
+            """Ferme la page courante et en ouvre une neuve pour éviter les crashes mémoire."""
+            global _current_page
+            try:
+                if _current_page:
+                    _current_page.close()
+            except Exception:
+                pass
+            p = ctx.new_page()
+            _current_page = p
+            return p
+
         for action in todo:
             try:
+                # Page fraîche pour chaque action → évite les crashes mémoire (OOM Railway)
+                page = _fresh_page()
                 _telegram(f"{icons.get(action, '⚙️')} <b>Début : {action}...</b>")
                 if action == "connexions":
                     stats["connexions"] = run_connexions(page, nb_connexions)
@@ -1610,7 +1628,7 @@ def run_linkedin_session(app=None) -> dict:
                 _pause(5, 15)
             except Exception as e:
                 print(f"   ❌ Action {action} : {e}")
-                _telegram(f"❌ Erreur lors de <b>{action}</b> : {str(e)[:100]}")
+                _telegram(f"❌ Erreur lors de <b>{action}</b> : {str(e)[:200]}")
 
         browser.close()
         _current_page = None
