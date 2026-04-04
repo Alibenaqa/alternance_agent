@@ -61,6 +61,13 @@ RECHERCHES_CONNEXION = [
 NOTE_MAX_CHARS = 300  # LinkedIn limite les notes de connexion
 
 _current_page = None  # page Playwright active pendant une session
+_session_log: list[str] = []
+
+
+def _log(msg: str):
+    """Enregistre un événement dans le log de session ET dans la console."""
+    print(msg)
+    _session_log.append(msg)
 
 
 def get_screenshot() -> bytes | None:
@@ -650,7 +657,7 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
                 ).first
 
         if not btn_connect.is_visible():
-            print(f"   ⏭️  Bouton connexion introuvable")
+            _log(f"   ⏭️  Bouton connexion introuvable")
             return False
 
         btn_connect.click()
@@ -681,7 +688,7 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
         return False
 
     except Exception as e:
-        print(f"   ❌ Erreur connexion : {e}")
+        _log(f"   ❌ Erreur connexion : {e}")
         return False
 
 
@@ -725,8 +732,8 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
             except Exception:
                 continue
 
-        print(f"   🔍 '{query}' → {len(candidats)} liens /in/ — URL: {page.url[:80]}")
-        print(f"   🔍 '{query}' → {len(candidats)} profils")
+        _log(f"   🔍 '{query}' → {len(candidats)} liens /in/ — URL: {page.url[:80]}")
+        _log(f"   🔍 '{query}' → {len(candidats)} profils")
         if not candidats:
             return profils
 
@@ -777,9 +784,9 @@ def run_connexions(page, nb_connexions: int) -> int:
         if envoyes >= nb_connexions:
             break
 
-        print(f"   🔍 Recherche : '{query}'")
+        _log(f"   🔍 Recherche : '{query}'")
         profils = _chercher_profils(page, query, max_profils=3)
-        print(f"   🔍 '{query}' → {len(profils)} profils")
+        _log(f"   🔍 '{query}' → {len(profils)} profils")
 
         for profil in profils:
             if envoyes >= nb_connexions:
@@ -837,30 +844,38 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1.5, 2.5)
 
-        # Approche JS : remonte depuis chaque lien /in/ pour trouver le post container,
-        # puis extrait le texte et l'URL du post. Ne dépend d'aucune classe CSS.
+        # Approche JS : part des liens de posts (timestamps), remonte pour trouver auteur + texte
         raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
             const seen = new Set();
 
-            const profileLinks = [...document.querySelectorAll('a[href*="/in/"]')];
+            // LinkedIn post URLs : /posts/ ou /feed/update/
+            const postLinks = [...document.querySelectorAll(
+                'a[href*="/posts/"], a[href*="/feed/update/"]'
+            )];
 
-            for (const link of profileLinks) {
+            for (const postLink of postLinks) {
                 if (results.length >= maxPosts) break;
-                const authorName = link.querySelector('span[aria-hidden="true"]')?.innerText?.trim() || '';
-                if (!authorName || authorName.length < 2) continue;
+                const url = postLink.href;
+                if (!url || seen.has(url)) continue;
+                // Ignore les liens courts (nav, sidebar)
+                if (!url.includes('activity') && !url.match(/posts[/].{10}/)) continue;
 
-                let container = link.parentElement;
-                for (let depth = 0; depth < 12; depth++) {
-                    if (!container) break;
-                    const textSpans = [...container.querySelectorAll('span[dir="ltr"]')]
-                        .filter(s => s.innerText.trim().length > 50);
-                    const postLink = container.querySelector('a[href*="/feed/update/"], a[href*="/posts/"]');
+                // Remonte pour trouver le conteneur qui a du texte ET un auteur
+                let container = postLink.parentElement;
+                for (let d = 0; d < 15; d++) {
+                    if (!container || container.tagName === 'BODY') break;
 
-                    if (textSpans.length > 0 && postLink) {
-                        const contenu = textSpans[0].innerText.trim();
-                        const url = postLink.href;
-                        if (!seen.has(url) && contenu.length > 50) {
+                    const textEl = [...container.querySelectorAll('span[dir="ltr"]')]
+                        .find(s => s.innerText.trim().length > 60);
+                    const authorLink = container.querySelector('a[href*="/in/"]');
+
+                    if (textEl && authorLink) {
+                        const contenu = textEl.innerText.trim();
+                        const authorName = authorLink.querySelector('span[aria-hidden="true"]')
+                            ?.innerText?.trim()
+                            || authorLink.innerText.split('\\n')[0].trim();
+                        if (contenu.length > 60 && authorName.length > 1) {
                             seen.add(url);
                             results.push({
                                 auteur: authorName,
@@ -878,7 +893,7 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
         }""", max_posts)
 
         posts = raw_posts if raw_posts else []
-        print(f"   📰 Feed scrapé : {len(posts)} posts")
+        _log(f"   📰 Feed scrapé : {len(posts)} posts")
 
     except Exception as e:
         print(f"   ❌ Scraping feed : {e}")
@@ -1000,54 +1015,57 @@ def run_likes(page, nb_likes: int) -> int:
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
-        # JS: trouve les boutons de réaction non encore cliqués (aria-pressed=false)
-        # et récupère leurs infos en un seul appel pour debug
-        btn_info = page.evaluate("""() => {
-            const all = [...document.querySelectorAll('button[aria-pressed]')];
-            return all.map(b => ({
-                label: b.getAttribute('aria-label') || b.innerText.trim().slice(0, 40),
-                pressed: b.getAttribute('aria-pressed'),
-            })).slice(0, 30);
+        # Dump TOUS les boutons de la page pour voir ce que LinkedIn affiche vraiment
+        all_btn_labels = page.evaluate("""() => {
+            return [...document.querySelectorAll('button')]
+                .map(b => (b.getAttribute('aria-label') || b.innerText.trim().slice(0, 30)))
+                .filter(t => t.length > 0)
+                .slice(0, 40);
         }""")
-        # Log les labels pour debug Railway
-        labels_str = " | ".join(f"{b['label']}({b['pressed']})" for b in btn_info[:15])
-        print(f"   🔍 Boutons aria-pressed: {labels_str[:300]}")
+        labels_str = " | ".join(all_btn_labels[:20])
+        _telegram(f"👍 Likes — tous les boutons feed:\n{labels_str[:400]}")
 
-        # JS: retourne les indices des boutons de réaction non encore cliqués
-        reaction_indices = page.evaluate("""() => {
-            const keywords = ["réagir", "react", "like", "j'aime", "aime",
+        # Cherche les boutons de réaction : aria-pressed présent (quelle que soit la valeur)
+        # + filtre par mots-clés dans aria-label
+        reaction_btns = page.evaluate("""() => {
+            const keywords = ["reagir", "react", "like", "j'aime", "aime",
                               "recommande", "soutiens", "felicite", "adore", "interessant"];
-            const all = [...document.querySelectorAll('button[aria-pressed="false"]')];
-            return all.map((b, i) => ({
-                i,
-                label: (b.getAttribute('aria-label') || '').toLowerCase(),
-            })).filter(b => keywords.some(kw => b.label.includes(kw)))
-               .map(b => b.i);
+            return [...document.querySelectorAll('button')]
+                .map((b, i) => ({
+                    i,
+                    label: (b.getAttribute('aria-label') || b.innerText.trim()).toLowerCase(),
+                    pressed: b.getAttribute('aria-pressed') || 'none',
+                }))
+                .filter(b => keywords.some(kw => b.label.includes(kw)) && b.pressed !== 'true')
+                .map(b => b.i);
         }""")
 
-        total_false = len(page.locator("button[aria-pressed='false']").all())
-        print(f"   👍 {len(reaction_indices)} boutons réaction (sur {total_false} aria-pressed=false)")
-        _telegram(f"👍 {len(reaction_indices)} boutons réaction | {total_false} aria-pressed=false\nLabels: {labels_str[:200]}")
+        _telegram(f"👍 {len(reaction_btns)} boutons réaction trouvés")
 
         likes = 0
-        all_btns = page.locator("button[aria-pressed='false']").all()
-        for idx in reaction_indices:
+        all_btns = page.locator("button").all()
+        for idx in reaction_btns:
             if likes >= nb_likes:
                 break
             try:
+                if idx >= len(all_btns):
+                    continue
                 btn = all_btns[idx]
                 if not btn.is_visible():
                     continue
                 btn.click()
                 likes += 1
-                print(f"   👍 Post liké ({likes}/{nb_likes})")
+                _log(f"   👍 Post liké ({likes}/{nb_likes})")
+                _telegram(f"👍 Post liké ({likes}/{nb_likes})")
                 _pause(3, 8)
-            except Exception:
+            except Exception as e:
+                _telegram(f"❌ Like btn {idx}: {str(e)[:80]}")
                 continue
 
         return likes
     except Exception as e:
-        print(f"   ❌ Likes : {e}")
+        _telegram(f"❌ run_likes crash: {str(e)[:200]}")
+        _log(f"   ❌ Likes : {e}")
         return 0
 
 
@@ -1341,7 +1359,7 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             return results.slice(0, 20);
         }""")
 
-        print(f"   💌 {len(connexions)} connexions trouvées sur la page")
+        _log(f"   💌 {len(connexions)} connexions trouvées sur la page")
         envoyes = 0
 
         for conn in connexions:
@@ -1381,7 +1399,7 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             envoyes += 1
             _pause(2, 4)
 
-        print(f"   ✅ {envoyes} DMs proposés sur Telegram")
+        _log(f"   ✅ {envoyes} DMs proposés sur Telegram")
         return envoyes
 
     except Exception as e:
@@ -1607,6 +1625,15 @@ def run_linkedin_session(app=None) -> dict:
         f"💌 DMs proposés : {stats['dms']}"
     )
     _telegram(msg)
+
+    # Envoie le log détaillé sur Telegram (découpé en morceaux si trop long)
+    if _session_log:
+        log_text = "\n".join(_session_log)
+        chunks = [log_text[i:i+3500] for i in range(0, len(log_text), 3500)]
+        for i, chunk in enumerate(chunks[:5]):
+            _telegram(f"📋 <b>Log session ({i+1}/{len(chunks)})</b>\n<pre>{chunk}</pre>")
+    _session_log.clear()
+
     print(f"\n✅ Session LinkedIn terminée : {stats}")
     return stats
 
