@@ -803,46 +803,89 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
 
 
 def run_connexions(page, nb_connexions: int) -> int:
-    """Lance nb_connexions demandes de connexion. Retourne le nombre réussi."""
+    """Envoie des connexions en cliquant les boutons Connect depuis la page de recherche.
+    Gère le modal de confirmation LinkedIn ("Send now") après chaque clic.
+    Évite de charger les pages profil (cause de Page crashed OOM)."""
     if nb_connexions == 0:
         return 0
 
-    print(f"\n🔗 Connexions LinkedIn — {nb_connexions} cibles")
+    _log(f"\n🔗 Connexions LinkedIn — {nb_connexions} cibles")
     envoyes = 0
-    queries = random.sample(RECHERCHES_CONNEXION, min(nb_connexions, len(RECHERCHES_CONNEXION)))
+    queries = random.sample(RECHERCHES_CONNEXION, min(nb_connexions + 2, len(RECHERCHES_CONNEXION)))
 
     for query in queries:
         if envoyes >= nb_connexions:
             break
 
         _log(f"   🔍 Recherche : '{query}'")
-        profils = _chercher_profils(page, query, max_profils=2)
-        _log(f"   🔍 '{query}' → {len(profils)} profils")
+        url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&network=%5B%22S%22%2C%22O%22%5D"
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=20000)
+        except Exception as e:
+            _log(f"   ❌ Goto search : {e}")
+            continue
+        _pause(2, 3)
 
-        for profil in profils:
+        # Debug : affiche les labels de boutons pour diagnostic
+        btns_debug = page.evaluate("""() => {
+            return [...document.querySelectorAll('button')]
+                .map(b => b.getAttribute('aria-label') || b.innerText.trim().slice(0, 40))
+                .filter(t => t.length > 0)
+                .slice(0, 30);
+        }""")
+        _log(f"   📋 Boutons page : {' | '.join(btns_debug[:15])}")
+
+        # Clique UN bouton Connect à la fois, puis gère le modal LinkedIn
+        for _ in range(nb_connexions - envoyes):
             if envoyes >= nb_connexions:
                 break
 
-            print(f"   ➡️  {profil['nom']}")
+            # Trouve et clique le premier bouton Connect non encore cliqué
+            nom = page.evaluate("""() => {
+                const btns = [...document.querySelectorAll('button')];
+                for (const btn of btns) {
+                    const label = (btn.getAttribute('aria-label') || btn.innerText || '').toLowerCase();
+                    if ((label.includes('invite') || label.includes('connect') || label.includes('connexion'))
+                        && (label.includes('connect') || label.includes('connexion') || label.includes('invite'))) {
+                        // Exclure les boutons déjà "pending" ou "message"
+                        if (label.includes('message') || label.includes('follow') || label.includes('abonner')) continue;
+                        const name = btn.getAttribute('aria-label') || btn.innerText.trim();
+                        try { btn.click(); return name; } catch(e) { return null; }
+                    }
+                }
+                return null;
+            }""")
 
-            # Note de connexion générée seulement si on trouve le bouton
-            note = _generer_note_connexion(profil["prenom"], profil["poste"], profil["entreprise"])
-            ok = _envoyer_connexion(page, profil["url"], note)
+            if not nom:
+                _log(f"   ⚠️ Plus de boutons Connect trouvés sur '{query}'")
+                break
 
-            if ok:
-                envoyes += 1
-                _log(f"   ✅ Connexion envoyée ({envoyes}/{nb_connexions})")
-                _telegram(
-                    f"🔗 <b>Connexion envoyée</b>\n"
-                    f"👤 {profil['nom']}\n"
-                    f"📝 {note[:100]}..."
-                )
-            else:
-                _log(f"   ⏭️  Échec")
+            _log(f"   🖱️ Clic Connect : {nom[:60]}")
+            _pause(1, 1.5)
 
-            _pause(2, 4)  # réduit de 4-10s à 2-4s
+            # Gère le modal de confirmation : "Send now" / "Envoyer maintenant" / "Suivant"
+            modal_label = page.evaluate("""() => {
+                const send_kw = ['send now', 'envoyer maintenant', 'send invitation', 'envoyer', 'suivant', 'next'];
+                const btns = [...document.querySelectorAll('button')];
+                for (const btn of btns) {
+                    const label = (btn.getAttribute('aria-label') || btn.innerText || '').toLowerCase().trim();
+                    if (send_kw.some(kw => label === kw || label.includes(kw))) {
+                        try { btn.click(); return label; } catch(e) {}
+                    }
+                }
+                return null;
+            }""")
 
-        _pause(2, 5)  # réduit de 5-12s à 2-5s
+            _pause(0.5, 1)
+            _log(f"   🔔 Modal : {modal_label or 'aucun modal détecté'}")
+
+            envoyes += 1
+            _log(f"   ✅ Connexion envoyée : {nom[:60]} ({envoyes}/{nb_connexions})")
+            _telegram(f"🔗 <b>Connexion envoyée</b>\n👤 {nom[:80]}")
+            _pause(2, 3)
+
+        _log(f"   📊 '{query}' terminé — total envoyé : {envoyes}/{nb_connexions}")
+        _pause(2, 4)
 
     return envoyes
 
@@ -856,12 +899,26 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     posts = []
     try:
         page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=20000)
-        _pause(3, 4)
 
-        # 2 scrolls rapides pour charger quelques posts
-        for _ in range(2):
+        # Attend que React ait rendu au moins un élément du feed
+        try:
+            page.wait_for_selector(
+                "div[data-id], article, .feed-shared-update-v2, div[data-urn]",
+                timeout=8000
+            )
+        except Exception:
+            pass  # continue quand même si timeout
+
+        _pause(2, 3)
+
+        # 4 scrolls pour charger plus de posts
+        for _ in range(4):
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1, 1.5)
+
+        # Debug : compte total de spans avant filtre
+        total_spans = page.evaluate("""() => document.querySelectorAll('span[dir="ltr"]').length""")
+        _log(f"   📰 Total spans[dir=ltr] dans le DOM : {total_spans}")
 
         # Approche JS directe : part des textes longs (span[dir=ltr]) qui sont les posts,
         # remonte pour trouver l'auteur. Pas de dépendance aux URLs de posts.

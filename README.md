@@ -731,6 +731,42 @@ page.evaluate("(maxPosts) => { ... }", max_posts)
 
 ---
 
+### 25. Connexions : invitation jamais envoyée (modal de confirmation ignoré)
+
+**Problème :** Après avoir cliqué "Invite [Name] to connect" sur la page de résultats de recherche, LinkedIn ouvre systématiquement un **modal de confirmation** avec un bouton "Send now" / "Envoyer maintenant". L'ancien code cliquait le bouton Connect mais ne gérait pas ce modal. Résultat : l'invitation restait en suspend, `envoyes` ne s'incrémentait jamais → 0 connexions.
+
+**Solution :**
+- Transformer la boucle JS-bulk (qui cliquait plusieurs boutons d'un coup) en boucle Python qui clique **un bouton à la fois**
+- Après chaque clic Connect, pause 1s puis JS cherche un bouton "send now" / "envoyer maintenant" / "envoyer" / "suivant" dans le DOM et le clique
+- Log Telegram du label du bouton modal pour diagnostiquer (`Modal géré : envoyer maintenant`)
+- Ajout d'un log debug des boutons présents sur la page avant chaque tentative
+
+```python
+# Après chaque clic Connect :
+_pause(1, 1.5)
+modal_label = page.evaluate("""() => {
+    const send_kw = ['send now', 'envoyer maintenant', 'envoyer', 'send', 'suivant', 'next'];
+    for (const btn of [...document.querySelectorAll('button')]) {
+        const label = (btn.getAttribute('aria-label') || btn.innerText || '').toLowerCase().trim();
+        if (send_kw.some(kw => label.includes(kw))) { btn.click(); return label; }
+    }
+    return null;
+}""")
+```
+
+---
+
+### 26. Feed : 0 posts (domcontentloaded trop rapide pour React)
+
+**Problème :** `_scraper_feed` naviguait vers `/feed/` avec `wait_until="domcontentloaded"` puis cherchait immédiatement les `span[dir="ltr"]`. React n'avait pas encore rendu les posts dans le DOM — le JS retournait un tableau vide même si des posts existaient.
+
+**Solution :**
+- Ajouter `page.wait_for_selector("div[data-id], article, .feed-shared-update-v2, div[data-urn]", timeout=8000)` après le `goto` pour attendre le rendu
+- Augmenter les scrolls de 2 à 4 (charge plus de posts)
+- Ajouter un log debug `Total spans[dir=ltr] dans le DOM : X` pour diagnostiquer si le DOM est vide ou bien peuplé
+
+---
+
 | Catégorie | Technologies |
 |-----------|-------------|
 | Langage | Python 3.14 |
