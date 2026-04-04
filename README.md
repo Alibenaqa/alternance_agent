@@ -473,7 +473,169 @@ alternance_agent/
 
 ---
 
-## Stack technique
+## LinkedIn Agent — Problèmes rencontrés & solutions
+
+Historique complet des obstacles techniques rencontrés lors du développement de `linkedin_agent.py` et des solutions appliquées.
+
+---
+
+### 1. Code 2FA LinkedIn jamais reçu à temps
+
+**Problème :** La boucle de polling Telegram bloquait la session Playwright. Le code arrivait 5–10 minutes après, bien après l'expiration de la fenêtre LinkedIn.
+
+**Solution :**
+- Remplacement du polling par un `threading.Event` avec timeout 600s
+- Ajout d'une route Flask `/set_code/<code>` comme canal alternatif (plus fiable quand Telegram est lent)
+- L'utilisateur peut envoyer `/linkedin_code XXXXXX` **ou** ouvrir le lien direct
+
+---
+
+### 2. Page "Something unexpected happened" (Welcome Back)
+
+**Problème :** LinkedIn détectait le bot au moment de soumettre le mot de passe sur la page "Welcome Back" et bloquait avec cette erreur.
+
+**Solution :**
+- Ignorer la page Welcome Back entièrement
+- Vider les cookies (`page.context.clear_cookies()`) et aller directement sur `/login`
+- Taper l'email et le mot de passe caractère par caractère avec `page.type()` + délai aléatoire 50–130ms
+
+---
+
+### 3. Champ `#username` introuvable
+
+**Problème :** Le sélecteur `#username` ne fonctionnait pas sur LinkedIn en français, qui utilise `session_key`.
+
+**Solution :** Sélecteurs multiples avec fallback :
+```python
+"#username, input[name='session_key'], input[autocomplete='username'], input[type='email']"
+```
+
+---
+
+### 4. CAPTCHA après plusieurs tentatives
+
+**Problème :** L'IP du container Railway est blacklistée par LinkedIn après quelques connexions, affichant un CAPTCHA impossible à résoudre en headless.
+
+**Solution :**
+- Script `export_linkedin_cookies.py` : exporte les cookies du vrai Chrome/Brave de l'utilisateur vers Turso
+- À chaque session, le bot charge ces cookies depuis Turso et les injecte dans le contexte Playwright
+- La session est authentifiée via les cookies réels, LinkedIn ne voit pas une connexion suspecte
+
+---
+
+### 5. Vérification par notification push (pas de champ code)
+
+**Problème :** LinkedIn envoyait une notification push dans l'app mobile au lieu d'un code email. Le bot attendait un code qui n'allait jamais arriver.
+
+**Solution :**
+- Détection de la page push ("Consultez votre appli LinkedIn")
+- Envoi d'un message Telegram demandant à l'utilisateur de taper "Oui" dans l'app
+- Boucle d'attente 3 minutes (36 × 5s) qui vérifie si la connexion est établie
+
+---
+
+### 6. Toutes les actions retournent 0
+
+**Problème :** Après une connexion réussie, toutes les actions (connexions, likes, commentaires, DMs) ne faisaient rien. La session se terminait en 2 minutes avec tout à 0.
+
+**Cause :** Les sélecteurs CSS (`div[class*='feed-shared-update']`, `li.mn-connection-card`, `button[aria-label*='Like']`) étaient complètement obsolètes — LinkedIn a refondu son DOM.
+
+**Solution :** Réécriture de toutes les fonctions pour ne plus dépendre des classes CSS :
+- Profils : `a[href*='/in/']` (stable depuis toujours)
+- Feed : JS qui remonte depuis les liens de posts (`/feed/update/`, `/posts/`) vers les containers
+- DMs : JS qui extrait les connexions depuis les liens `/in/` de la page connexions
+- Likes : `button[aria-pressed="false"]` + filtre par mots-clés de réaction en JS
+
+---
+
+### 7. Noms de profils pollués (`\n • 2nd\nAI Engineer...`)
+
+**Problème :** `inner_text()` sur un lien `/in/` retournait tout le texte de la carte (nom + badge + titre), rendant les noms inutilisables.
+
+**Solution :** Extraction du premier span `aria-hidden="true"` (nom uniquement), avec fallback sur la première ligne non vide qui ne contient pas `•` ou `Connect`.
+
+---
+
+### 8. 0 profils trouvés pour les requêtes simples
+
+**Problème :** Les requêtes courtes ("Software Engineer", "BI Analyst") retournaient 0 résultats parce que LinkedIn redirige vers une page d'accueil sans résultats.
+
+**Solution :** Ajout du suffixe "France" à toutes les requêtes. Requêtes actuelles :
+```python
+["Data Analyst France", "Data Engineer France", "Data Scientist France",
+ "Software Engineer France", "Machine Learning France", "Recruteur tech Paris", ...]
+```
+
+---
+
+### 9. Session bloquée 4+ minutes (debug loops)
+
+**Problème :** Des boucles Python itéraient `get_attribute()` sur 20 boutons un par un — chaque appel Playwright est une IPC synchrone. Sur Railway, avec la latence réseau, ça prenait 4 minutes pour un simple debug.
+
+**Solution :** Supprimer toutes les boucles de debug Python. Remplacer par des appels `page.evaluate()` JS qui font tout le travail en un seul round-trip et retournent un tableau.
+
+---
+
+### 10. Page crashed (Out Of Memory Railway)
+
+**Problème :** Le container Railway a une RAM limitée. LinkedIn charge des images, vidéos, polices et scripts lourds. Après 3–4 navigations, le navigateur crashait avec `Page.goto: Page crashed`.
+
+**Solutions appliquées :**
+- `page.route()` pour bloquer les ressources `image` et `media` avant téléchargement (−70% RAM)
+- `wait_until="domcontentloaded"` au lieu de `load` — s'arrête avant les scripts lourds
+- `page.goto("about:blank")` avant chaque profil pour vider le DOM et libérer la RAM
+- Page fraîche (`ctx.new_page()`) entre chaque action de session (connexions, likes, DMs, etc.)
+- Flag Chromium `--blink-settings=imagesEnabled=false` comme couche supplémentaire
+
+---
+
+### 11. Bouton "Se connecter" introuvable
+
+**Problème :** Le sélecteur `button:has-text('Se connecter')` ne trouvait rien même sur des profils où le bouton était visible en screenshot.
+
+**Cause :** Quand les CSS chargent partiellement (à cause des blocages RAM), LinkedIn rend le bouton Connect comme un `<a>` (lien) au lieu d'un `<button>`.
+
+**Solution :** Sélecteurs étendus pour couvrir les deux cas :
+```python
+"button:has-text('Connect'), button:has-text('Se connecter'), "
+"a:has-text('Connect'), a:has-text('Se connecter'), "
+"button[aria-label*='Connect'], button[aria-label*='Inviter']"
+```
+
+---
+
+### 12. Profil vide au chargement (React pas encore rendu)
+
+**Problème :** Avec `domcontentloaded`, Playwright s'arrêtait avant que React ait rendu le contenu du profil. La page était grise, aucun bouton n'existait.
+
+**Solution :** Attendre l'apparition de `<main>` après le chargement :
+```python
+page.wait_for_selector("main", timeout=8000)
+```
+
+---
+
+### 13. DMs filtrés à 0 (poste vide = "autre")
+
+**Problème :** L'extraction JS du poste sur la page connexions retournait souvent une chaîne vide. `_classifier_profil("")` retournait `"autre"`, et le filtre `if type_profil == "autre": continue` éliminait 100% des connexions.
+
+**Solution :** Supprimer le filtre strict. Si le poste est vide ou inconnu, utiliser le template `data_tech` (networking générique) par défaut.
+
+---
+
+### 14. Feed scrapé : 0 posts (mauvais argument JS)
+
+**Problème :** `page.evaluate(f"(maxPosts) => {{ ... }}, {max_posts}")` — le `max_posts` était interpolé **dans la string** au lieu d'être passé comme second argument de `evaluate`. La fonction JS recevait `undefined` comme argument.
+
+**Solution :**
+```python
+# Avant (cassé)
+page.evaluate(f"(maxPosts) => {{ ... }}, {max_posts}")
+# Après (correct)
+page.evaluate("(maxPosts) => { ... }", max_posts)
+```
+
+---
 
 | Catégorie | Technologies |
 |-----------|-------------|
