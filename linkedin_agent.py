@@ -818,23 +818,16 @@ def run_connexions(page, nb_connexions: int) -> int:
             break
 
         _log(f"   🔍 Recherche : '{query}'")
-        # Pas de filtre réseau — pour voir un max de profils avec bouton Connect
-        url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}"
+        # Filtre 2e/3e degré → profils avec bouton Connect (pas Follow)
+        url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&network=%5B%22S%22%2C%22O%22%5D"
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=20000)
         except Exception as e:
             _log(f"   ❌ Goto search : {e}")
             continue
 
-        # Attend que les cartes de résultats soient rendues par React
-        try:
-            page.wait_for_selector(
-                "li.reusable-search__result-container, button[aria-label*='nvite'], button[aria-label*='onnect']",
-                timeout=8000
-            )
-        except Exception:
-            _log(f"   ⚠️ wait_for_selector timeout sur '{query}'")
-        _pause(1, 2)
+        # Laisse React rendre les cartes (5s suffisent, pas de wait_for_selector qui cause OOM)
+        _pause(4, 5)
 
         # Debug : affiche les labels de boutons pour diagnostic
         btns_debug = page.evaluate("""() => {
