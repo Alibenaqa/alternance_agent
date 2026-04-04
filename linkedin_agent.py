@@ -639,16 +639,22 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
             pass
         _pause(1, 2)
 
-        # Cherche le bouton/lien "Se connecter" / "Connect" via JS (plus fiable)
-        connect_idx = page.evaluate("""() => {
+        # Cherche le bouton/lien "Se connecter" / "Connect" via JS
+        connect_info = page.evaluate("""() => {
             const texts = ['se connecter', 'connect', 'inviter', 'invite'];
             const els = [...document.querySelectorAll('button, a')];
+            const allLabels = els.map((e,i) => {
+                const t = (e.getAttribute('aria-label') || e.innerText || '').trim().slice(0, 30);
+                return t ? `${i}:${t}` : null;
+            }).filter(Boolean).slice(0, 30).join(' | ');
             for (let i = 0; i < els.length; i++) {
                 const t = (els[i].getAttribute('aria-label') || els[i].innerText || '').toLowerCase().trim();
-                if (texts.some(kw => t === kw || t.startsWith(kw + ' '))) return i;
+                if (texts.some(kw => t === kw || t.startsWith(kw + ' '))) return {idx: i, all: allLabels};
             }
-            return -1;
+            return {idx: -1, all: allLabels};
         }""")
+        connect_idx = connect_info['idx']
+        _log(f"   🔍 connect_idx={connect_idx} — {connect_info['all'][:200]}")
 
         if connect_idx == -1:
             # Essai dans le menu "Plus" / "More"
@@ -888,10 +894,10 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
                     container = container.parentElement;
                 }
 
-                if (auteur && contenu.length > 80) {
+                if (contenu.length > 80) {
                     seenText.add(contenu.slice(0, 50));
                     results.push({
-                        auteur: auteur,
+                        auteur: auteur || 'LinkedIn',
                         titre_auteur: '',
                         contenu: contenu.slice(0, 600),
                         url: url || '',
@@ -1048,24 +1054,32 @@ def run_likes(page, nb_likes: int) -> int:
         _telegram(f"👍 {len(reaction_btns)} boutons réaction trouvés")
 
         likes = 0
-        all_btns = page.locator("button").all()
-        for idx in reaction_btns:
+        for _ in reaction_btns:
             if likes >= nb_likes:
                 break
+            # Re-évalue à chaque like : les indices changent après scroll/click
+            idx = page.evaluate("""() => {
+                const keywords = ["reagir", "react", "like", "j'aime", "aime",
+                                  "recommande", "soutiens", "felicite", "adore", "interessant"];
+                const btns = [...document.querySelectorAll('button')];
+                for (let i = 0; i < btns.length; i++) {
+                    const label = (btns[i].getAttribute('aria-label') || btns[i].innerText.trim()).toLowerCase();
+                    const pressed = btns[i].getAttribute('aria-pressed') || 'none';
+                    if (pressed !== 'true' && keywords.some(kw => label.includes(kw))) return i;
+                }
+                return -1;
+            }""")
+            if idx == -1:
+                break
             try:
-                if idx >= len(all_btns):
-                    continue
-                btn = all_btns[idx]
-                if not btn.is_visible():
-                    continue
-                btn.click()
+                btn = page.locator("button").nth(idx)
+                btn.click(timeout=3000)
                 likes += 1
                 _log(f"   👍 Post liké ({likes}/{nb_likes})")
                 _telegram(f"👍 Post liké ({likes}/{nb_likes})")
-                _pause(3, 8)
-            except Exception as e:
-                _telegram(f"❌ Like btn {idx}: {str(e)[:80]}")
-                continue
+                _pause(3, 5)
+            except Exception:
+                break
 
         return likes
     except Exception as e:
