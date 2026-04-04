@@ -626,16 +626,12 @@ def _login(page) -> bool:
 def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
     """Ouvre un profil LinkedIn et envoie une demande de connexion avec note."""
     try:
-        # Vide la mémoire avant chaque profil
-        page.goto("about:blank", timeout=5000)
-        _pause(0.5, 1)
-        page.goto(profil_url, wait_until="domcontentloaded", timeout=25000)
-        # Attend que le contenu React du profil soit rendu (section principale)
+        page.goto(profil_url, wait_until="domcontentloaded", timeout=20000)
         try:
-            page.wait_for_selector("main", timeout=8000)
+            page.wait_for_selector("main", timeout=5000)
         except Exception:
             pass
-        _pause(2, 3)
+        _pause(1, 2)
 
         # Cherche le bouton/lien "Se connecter" / "Connect"
         # LinkedIn utilise parfois <a> au lieu de <button>
@@ -778,41 +774,33 @@ def run_connexions(page, nb_connexions: int) -> int:
             break
 
         _log(f"   🔍 Recherche : '{query}'")
-        profils = _chercher_profils(page, query, max_profils=3)
+        profils = _chercher_profils(page, query, max_profils=2)
         _log(f"   🔍 '{query}' → {len(profils)} profils")
 
         for profil in profils:
             if envoyes >= nb_connexions:
                 break
 
-            print(f"   ➡️  {profil['nom']} — {profil['poste']} @ {profil['entreprise']}")
+            print(f"   ➡️  {profil['nom']}")
 
-            # Classifie le profil pour adapter l'approche
-            type_profil = _classifier_profil(profil["poste"])
-
+            # Note de connexion générée seulement si on trouve le bouton
             note = _generer_note_connexion(profil["prenom"], profil["poste"], profil["entreprise"])
             ok = _envoyer_connexion(page, profil["url"], note)
 
             if ok:
                 envoyes += 1
-                print(f"   ✅ Connexion envoyée ({envoyes}/{nb_connexions})")
+                _log(f"   ✅ Connexion envoyée ({envoyes}/{nb_connexions})")
                 _telegram(
                     f"🔗 <b>Connexion envoyée</b>\n"
                     f"👤 {profil['nom']}\n"
-                    f"💼 {profil['poste']} @ {profil['entreprise']}\n"
-                    f"📝 Note : {note[:100]}..."
+                    f"📝 {note[:100]}..."
                 )
-
-                # Tente aussi un email si profil RH ou data/tech
-                if type_profil in ("rh", "data_tech") and profil.get("entreprise"):
-                    _pause(2, 4)
-                    _tenter_email_profil(profil, type_profil)
             else:
-                print(f"   ⏭️  Échec")
+                _log(f"   ⏭️  Échec")
 
-            _pause(4, 10)  # pause longue entre connexions
+            _pause(2, 4)  # réduit de 4-10s à 2-4s
 
-        _pause(5, 12)
+        _pause(2, 5)  # réduit de 5-12s à 2-5s
 
     return envoyes
 
@@ -1617,7 +1605,7 @@ def run_linkedin_session(app=None) -> dict:
                 elif action == "dms":
                     stats["dms"] = run_messages_directs(page, nb_dms, app)
                     _telegram(f"✅ DMs terminés : {stats['dms']} proposés")
-                _pause(5, 15)
+                _pause(2, 5)
             except Exception as e:
                 print(f"   ❌ Action {action} : {e}")
                 _telegram(f"❌ Erreur lors de <b>{action}</b> : {str(e)[:200]}")
