@@ -623,6 +623,14 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 15. Feed scrapé : 0 posts (liens /posts/ absents du DOM)
+
+**Problème :** Le scraper cherchait les liens `a[href*="/posts/"]` et `a[href*="/feed/update/"]` comme point de départ. Ces liens n'existent pas dans le DOM quand les ressources sont bloquées (images/media interceptés par `page.route()`).
+
+**Solution :** Inverser la logique — partir des **textes** (`span[dir="ltr"]` > 80 chars) qui eux sont toujours dans le DOM, puis remonter le DOM pour trouver l'auteur (lien `/in/`) et l'URL optionnelle du post. Résultat : le scraper fonctionne même sans CSS ni images.
+
+---
+
 ### 14. Feed scrapé : 0 posts (mauvais argument JS)
 
 **Problème :** `page.evaluate(f"(maxPosts) => {{ ... }}, {max_posts}")` — le `max_posts` était interpolé **dans la string** au lieu d'être passé comme second argument de `evaluate`. La fonction JS recevait `undefined` comme argument.
