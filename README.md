@@ -623,6 +623,30 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 21. Likes : Target crashed après le 3e like
+
+**Problème :** Le JS évaluait les indices des boutons une seule fois au début. Après chaque like + pause (3-8s), le feed scrollait, de nouveaux boutons apparaissaient, les anciens indices devenaient invalides → `Target crashed` sur tous les boutons restants.
+
+**Solution :** Re-évaluer l'index du prochain bouton de réaction en JS **après chaque like**, en cherchant le premier bouton `aria-pressed != "true"` avec un mot-clé de réaction. Plus d'indices stables = plus de crash.
+
+---
+
+### 22. Connexions : connect_idx = -1 sur tous les profils
+
+**Problème :** Le JS cherchait exactement `"connect"` ou `"se connecter"` mais les boutons LinkedIn peuvent avoir des aria-labels comme `"Inviter Mohamed Ali à se connecter"` — le match exact échouait.
+
+**Solution :** Ajouter un log complet (`connect_idx=X — 0:label | 1:label...`) dans le session log pour voir exactement ce que LinkedIn affiche sur les profils visités.
+
+---
+
+### 23. Feed : 0 posts (auteur requis mais absent)
+
+**Problème :** Le scraper ignorait les posts sans lien `/in/` trouvé dans le container. Certains posts n'ont pas de lien auteur accessible dans le DOM partiel.
+
+**Solution :** Rendre l'auteur optionnel — accepter le post même sans auteur, avec fallback `"LinkedIn"`.
+
+---
+
 ### 20. Session bloquée sur commentaires (feed trop lent)
 
 **Problème :** `_scraper_feed` accumulait : 8s `wait_for_selector` + 5 scrolls × 1.5-2.5s = jusqu'à 20s juste pour charger le feed. Avec 4 commentaires max et les appels Claude, la session pouvait rester bloquée 15+ minutes.
