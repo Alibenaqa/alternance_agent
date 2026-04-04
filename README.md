@@ -623,6 +623,30 @@ page.wait_for_selector("main", timeout=8000)
 
 ---
 
+### 17. Bouton Connect introuvable (sélecteur CSS vs JS)
+
+**Problème :** `page.locator("button:has-text('Connect')")` retournait un locator vide même quand le bouton était visible dans le screenshot. Résidu de l'ancien `btn_connect.click()` après la réécriture.
+
+**Solution :** Utiliser `page.evaluate()` JS pour parcourir tous les `button` et `a` et retourner l'index de celui dont le texte/aria-label correspond exactement à "connect" / "se connecter" / "inviter". Plus fiable que les sélecteurs Playwright qui dépendent du contexte.
+
+---
+
+### 18. DMs : 0 connexions trouvées (networkidle bloqué)
+
+**Problème :** `page.wait_for_load_state("networkidle")` ne se résolvait jamais car `page.route()` intercepte les requêtes image/media, ce qui empêche LinkedIn d'atteindre l'état "networkidle" (réseau inactif).
+
+**Solution :** Remplacer par `domcontentloaded` + `wait_for_selector("a[href*='/in/']", timeout=8000)` — attend que les liens de profils soient présents dans le DOM.
+
+---
+
+### 19. Feed : 0 posts (span[dir=ltr] pas encore rendu)
+
+**Problème :** Le scraper cherchait les `span[dir="ltr"]` juste après `domcontentloaded`, avant que React ait rendu les posts.
+
+**Solution :** Ajouter `wait_for_selector("span[dir='ltr']", timeout=8000)` avant de lancer le JS de scraping — attend que le premier texte de post soit présent.
+
+---
+
 ### 16. Session bloquée 15+ minutes sur les connexions
 
 **Problème :** Avec 6 connexions, la session mettait plus de 15 minutes. Chaque profil accumulait : `about:blank` (1s) + `goto profil` (25s max) + `wait main` (8s) + pause (2-3s) + appel Claude pour la note (3-10s) + pause après (4-10s) + pause entre queries (5-12s) = ~50-60s par profil × 6 queries × 3 profils = ~15 min.
