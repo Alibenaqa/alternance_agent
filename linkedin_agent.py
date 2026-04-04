@@ -619,19 +619,6 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
     try:
         page.goto(profil_url, timeout=20000)
         _pause_humaine()
-        _telegram_screenshot(page, f"🔍 Profil ouvert — {page.url[:60]}")
-
-        # Log tous les boutons visibles pour debug
-        all_btns = page.locator("button").all()
-        btn_labels = []
-        for b in all_btns[:15]:
-            try:
-                lbl = (b.get_attribute("aria-label") or b.inner_text() or "").strip()[:30]
-                if lbl:
-                    btn_labels.append(lbl)
-            except Exception:
-                pass
-        _telegram(f"🔘 Boutons profil : {btn_labels[:8]}")
 
         # Cherche le bouton "Se connecter" / "Connect"
         btn_connect = page.locator(
@@ -699,8 +686,6 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
             pass
         _pause_humaine()
 
-        # Screenshot pour voir ce que la page de recherche affiche
-        _telegram_screenshot(page, f"🔍 Page recherche '{query[:30]}' — {page.url[:60]}")
 
         # Approche directe : récupère tous les liens /in/ visibles sur la page
         liens = page.locator("a[href*='/in/']").all()
@@ -730,7 +715,7 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
                 continue
 
         print(f"   🔍 '{query}' → {len(candidats)} liens /in/ — URL: {page.url[:80]}")
-        _telegram(f"🔍 '{query[:30]}' → {len(candidats)} liens trouvés : {[c['nom'][:20] for c in candidats[:5]]}")
+        print(f"   🔍 '{query}' → {len(candidats)} profils")
         if not candidats:
             return profils
 
@@ -783,7 +768,7 @@ def run_connexions(page, nb_connexions: int) -> int:
 
         print(f"   🔍 Recherche : '{query}'")
         profils = _chercher_profils(page, query, max_profils=3)
-        _telegram(f"🔍 '{query}' → {len(profils)} profils : {[p['nom'] for p in profils]}")
+        print(f"   🔍 '{query}' → {len(profils)} profils")
 
         for profil in profils:
             if envoyes >= nb_connexions:
@@ -996,24 +981,7 @@ def run_likes(page, nb_likes: int) -> int:
             page.evaluate("window.scrollBy(0, 600)")
             _pause(1, 2)
 
-        _telegram_screenshot(page, f"🔍 Feed après scroll — {page.url[:60]}")
-
-        # Debug : log tous les aria-labels de boutons visibles
-        all_btns = page.locator("button[aria-label]").all()
-        labels = []
-        for b in all_btns[:20]:
-            try:
-                lbl = b.get_attribute("aria-label") or ""
-                if lbl:
-                    labels.append(lbl[:40])
-            except Exception:
-                pass
-        print(f"   🔍 Boutons aria-label trouvés : {labels}")
-        if labels:
-            _telegram(f"🔍 Boutons feed : {', '.join(labels[:10])}")
-
         likes = 0
-        # Cherche directement tous les boutons Like/Réagir sur la page
         btns_like = page.locator(
             "button[aria-label*='Like'], button[aria-label*=\"J'aime\"], "
             "button[aria-label*='like'], button[aria-label*=\"j'aime\"], "
