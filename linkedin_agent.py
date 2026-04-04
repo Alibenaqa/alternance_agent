@@ -46,16 +46,16 @@ MAX_COMMENTAIRES_JOUR = 6
 
 # Profils cibles pour les connexions
 RECHERCHES_CONNEXION = [
-    "Data Analyst",
-    "Data Engineer",
-    "Data Scientist",
-    "Software Engineer",
-    "Développeur Python",
-    "Machine Learning",
-    "Recruteur tech",
-    "BI Analyst",
-    "AI Engineer",
-    "MLOps",
+    "Data Analyst France",
+    "Data Engineer France",
+    "Data Scientist France",
+    "Software Engineer France",
+    "Développeur Python Paris",
+    "Machine Learning France",
+    "Recruteur tech Paris",
+    "Business Intelligence France",
+    "AI Engineer France",
+    "MLOps France",
 ]
 
 NOTE_MAX_CHARS = 300  # LinkedIn limite les notes de connexion
@@ -619,11 +619,25 @@ def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
     try:
         page.goto(profil_url, timeout=20000)
         _pause_humaine()
+        _telegram_screenshot(page, f"🔍 Profil ouvert — {page.url[:60]}")
+
+        # Log tous les boutons visibles pour debug
+        all_btns = page.locator("button").all()
+        btn_labels = []
+        for b in all_btns[:15]:
+            try:
+                lbl = (b.get_attribute("aria-label") or b.inner_text() or "").strip()[:30]
+                if lbl:
+                    btn_labels.append(lbl)
+            except Exception:
+                pass
+        _telegram(f"🔘 Boutons profil : {btn_labels[:8]}")
 
         # Cherche le bouton "Se connecter" / "Connect"
         btn_connect = page.locator(
             "button:has-text('Se connecter'), button:has-text('Connect'), "
-            "button[aria-label*='Connect'], button[aria-label*='Se connecter']"
+            "button[aria-label*='Connect'], button[aria-label*='Se connecter'], "
+            "button[aria-label*='Inviter'], button[aria-label*='Invite']"
         ).first
 
         if not btn_connect.is_visible():
