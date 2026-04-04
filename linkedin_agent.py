@@ -626,8 +626,11 @@ def _login(page) -> bool:
 def _envoyer_connexion(page, profil_url: str, note: str) -> bool:
     """Ouvre un profil LinkedIn et envoie une demande de connexion avec note."""
     try:
-        page.goto(profil_url, timeout=20000)
-        _pause_humaine()
+        # Vide la mémoire avant chaque profil
+        page.goto("about:blank", timeout=5000)
+        _pause(0.5, 1)
+        page.goto(profil_url, wait_until="domcontentloaded", timeout=25000)
+        _pause(2, 4)
 
         # Screenshot + dump boutons → Telegram pour identifier le bon sélecteur
         _telegram_screenshot(page, f"🔍 Profil chargé: {profil_url.split('/in/')[-1][:40]}")
@@ -699,12 +702,8 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
     profils = []
     try:
         url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&network=%5B%22S%22%2C%22O%22%5D"
-        page.goto(url, timeout=20000)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            pass
-        _pause_humaine()
+        page.goto(url, wait_until="domcontentloaded", timeout=25000)
+        _pause(3, 5)
 
 
         # JS : extrait tous les liens /in/ en un seul appel (pas d'itération Python)
@@ -824,12 +823,8 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
     """Scrape les posts du feed LinkedIn via JS pour éviter la dépendance aux classes CSS."""
     posts = []
     try:
-        page.goto("https://www.linkedin.com/feed/", timeout=20000)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            pass
-        _pause_humaine()
+        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=25000)
+        _pause(3, 5)
 
         # Scroll pour charger plus de posts
         for _ in range(5):
@@ -996,12 +991,8 @@ def run_likes(page, nb_likes: int) -> int:
 
     print(f"\n👍 Likes LinkedIn — {nb_likes} cibles")
     try:
-        page.goto("https://www.linkedin.com/feed/", timeout=20000)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            pass
-        _pause_humaine()
+        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=25000)
+        _pause(3, 5)
 
         for _ in range(4):
             page.evaluate("window.scrollBy(0, 600)")
@@ -1543,7 +1534,7 @@ def run_linkedin_session(app=None) -> dict:
         browser, ctx = _launch_browser(p)
         page = ctx.new_page()
         page.route("**/*", lambda route: route.abort()
-            if route.request.resource_type in ("image", "media", "font", "stylesheet")
+            if route.request.resource_type in ("image", "media")
             else route.continue_())
         global _current_page
         _current_page = page
