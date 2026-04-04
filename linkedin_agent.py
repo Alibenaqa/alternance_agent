@@ -838,50 +838,43 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
 
         # Approche JS : remonte depuis chaque lien /in/ pour trouver le post container,
         # puis extrait le texte et l'URL du post. Ne dépend d'aucune classe CSS.
-        raw_posts = page.evaluate(f"""(maxPosts) => {{
+        raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
             const seen = new Set();
 
-            // Trouve tous les liens vers des profils dans le feed
             const profileLinks = [...document.querySelectorAll('a[href*="/in/"]')];
 
-            for (const link of profileLinks) {{
+            for (const link of profileLinks) {
                 if (results.length >= maxPosts) break;
                 const authorName = link.querySelector('span[aria-hidden="true"]')?.innerText?.trim() || '';
                 if (!authorName || authorName.length < 2) continue;
 
-                // Remonte dans le DOM pour trouver le conteneur du post
-                // (celui qui contient à la fois l'auteur ET du texte long)
                 let container = link.parentElement;
-                let found = false;
-                for (let depth = 0; depth < 12; depth++) {{
+                for (let depth = 0; depth < 12; depth++) {
                     if (!container) break;
-                    // Cherche du texte de post (span[dir=ltr] avec >50 chars)
                     const textSpans = [...container.querySelectorAll('span[dir="ltr"]')]
                         .filter(s => s.innerText.trim().length > 50);
-                    // Cherche un lien vers le post
                     const postLink = container.querySelector('a[href*="/feed/update/"], a[href*="/posts/"]');
 
-                    if (textSpans.length > 0 && postLink) {{
+                    if (textSpans.length > 0 && postLink) {
                         const contenu = textSpans[0].innerText.trim();
                         const url = postLink.href;
-                        if (!seen.has(url) && contenu.length > 50) {{
+                        if (!seen.has(url) && contenu.length > 50) {
                             seen.add(url);
-                            results.push({{
+                            results.push({
                                 auteur: authorName,
                                 titre_auteur: '',
                                 contenu: contenu.slice(0, 600),
                                 url: url,
-                            }});
-                            found = true;
-                        }}
+                            });
+                        }
                         break;
-                    }}
+                    }
                     container = container.parentElement;
-                }}
-            }}
+                }
+            }
             return results;
-        }}, {max_posts}""")
+        }""", max_posts)
 
         posts = raw_posts if raw_posts else []
         print(f"   📰 Feed scrapé : {len(posts)} posts")
@@ -1019,27 +1012,29 @@ def run_likes(page, nb_likes: int) -> int:
         labels_str = " | ".join(f"{b['label']}({b['pressed']})" for b in btn_info[:15])
         print(f"   🔍 Boutons aria-pressed: {labels_str[:300]}")
 
+        # JS: retourne les indices des boutons de réaction non encore cliqués
+        reaction_indices = page.evaluate("""() => {
+            const keywords = ["réagir", "react", "like", "j'aime", "aime",
+                              "recommande", "soutiens", "felicite", "adore", "interessant"];
+            const all = [...document.querySelectorAll('button[aria-pressed="false"]')];
+            return all.map((b, i) => ({
+                i,
+                label: (b.getAttribute('aria-label') || '').toLowerCase(),
+            })).filter(b => keywords.some(kw => b.label.includes(kw)))
+               .map(b => b.i);
+        }""")
+
+        total_false = len(page.locator("button[aria-pressed='false']").all())
+        print(f"   👍 {len(reaction_indices)} boutons réaction (sur {total_false} aria-pressed=false)")
+        _telegram(f"👍 {len(reaction_indices)} boutons réaction | {total_false} aria-pressed=false\nLabels: {labels_str[:200]}")
+
         likes = 0
-        # Sélecteur large : tous les boutons avec aria-pressed=false (réactions non encore faites)
-        # LinkedIn utilise aria-pressed pour les boutons de réaction
-        btns_like = page.locator("button[aria-pressed='false']").all()
-        reaction_keywords = ["réagir", "react", "like", "j'aime", "aime", "recommande", "soutiens", "felicite", "adore", "interessant"]
-        filtered = []
-        for btn in btns_like:
-            try:
-                label = (btn.get_attribute("aria-label") or "").lower()
-                if any(kw in label for kw in reaction_keywords):
-                    filtered.append(btn)
-            except Exception:
-                continue
-
-        print(f"   👍 {len(filtered)} boutons réaction trouvés (sur {len(btns_like)} aria-pressed=false)")
-        _telegram(f"👍 {len(filtered)} boutons réaction | {len(btns_like)} aria-pressed=false\nLabels: {labels_str[:200]}")
-
-        for btn in filtered:
+        all_btns = page.locator("button[aria-pressed='false']").all()
+        for idx in reaction_indices:
             if likes >= nb_likes:
                 break
             try:
+                btn = all_btns[idx]
                 if not btn.is_visible():
                     continue
                 btn.click()
