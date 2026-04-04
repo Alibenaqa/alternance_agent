@@ -405,9 +405,7 @@ def _launch_browser(playwright):
             "--no-zygote", "--disable-setuid-sandbox",
             "--disable-blink-features=AutomationControlled",
             "--disable-extensions", "--disable-plugins",
-            "--js-flags=--max-old-space-size=256",
-            "--memory-pressure-off",
-            "--single-process",
+            "--blink-settings=imagesEnabled=false",
         ],
     )
     ctx = browser.new_context(
@@ -709,35 +707,33 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
         _pause_humaine()
 
 
-        # Approche directe : récupère tous les liens /in/ visibles sur la page
-        liens = page.locator("a[href*='/in/']").all()
-        vus = set()
-        candidats = []
-        for lien_el in liens:
-            try:
-                href = lien_el.get_attribute("href") or ""
-                href = href.split("?")[0]
-                if not href or href in vus:
-                    continue
-                if "linkedin.com/in/" not in href and not href.startswith("/in/"):
-                    continue
-                # Nom : première ligne non vide, max 40 chars
-                nom = ""
-                raw = lien_el.inner_text().strip()
-                for ligne in raw.split("\n"):
-                    ligne = ligne.strip()
-                    if ligne and len(ligne) > 2 and "•" not in ligne and "Connect" not in ligne:
-                        nom = ligne[:40]
-                        break
-                if not nom:
-                    nom = href.split("/in/")[-1].strip("/").replace("-", " ").title()[:40]
-                vus.add(href)
-                candidats.append({"href": href, "nom": nom})
-            except Exception:
-                continue
+        # JS : extrait tous les liens /in/ en un seul appel (pas d'itération Python)
+        candidats = page.evaluate("""() => {
+            const seen = new Set();
+            const results = [];
+            for (const a of document.querySelectorAll('a[href*="/in/"]')) {
+                let href = a.href.split('?')[0];
+                if (!href || seen.has(href)) continue;
+                if (!href.includes('/in/')) continue;
+                seen.add(href);
+                const nameEl = a.querySelector('span[aria-hidden="true"]');
+                let nom = nameEl ? nameEl.innerText.trim() : '';
+                if (!nom) {
+                    for (const line of a.innerText.split('\\n')) {
+                        const t = line.trim();
+                        if (t.length > 2 && !t.includes('•') && t !== 'Connect') {
+                            nom = t.slice(0, 40);
+                            break;
+                        }
+                    }
+                }
+                if (!nom) nom = href.split('/in/')[1].split('/')[0].replace(/-/g,' ');
+                if (nom) results.push({href, nom: nom.slice(0, 40)});
+            }
+            return results;
+        }""")
 
         _log(f"   🔍 '{query}' → {len(candidats)} liens /in/ — URL: {page.url[:80]}")
-        _log(f"   🔍 '{query}' → {len(candidats)} profils")
         if not candidats:
             return profils
 
@@ -746,15 +742,7 @@ def _chercher_profils(page, query: str, max_profils: int = 5) -> list[dict]:
             href = c["href"]
             if not href.startswith("http"):
                 href = "https://www.linkedin.com" + href
-
             nom = c["nom"]
-            if not nom or len(nom) < 3:
-                try:
-                    lien_el = page.locator(f"a[href*='{href.split('/in/')[1].split('/')[0]}'] span[aria-hidden='true']").first
-                    if lien_el.count():
-                        nom = lien_el.inner_text().strip()
-                except Exception:
-                    pass
 
             if not nom or len(nom) < 3:
                 continue
@@ -1554,6 +1542,9 @@ def run_linkedin_session(app=None) -> dict:
     with sync_playwright() as p:
         browser, ctx = _launch_browser(p)
         page = ctx.new_page()
+        page.route("**/*", lambda route: route.abort()
+            if route.request.resource_type in ("image", "media", "font", "stylesheet")
+            else route.continue_())
         global _current_page
         _current_page = page
 
@@ -1591,7 +1582,7 @@ def run_linkedin_session(app=None) -> dict:
         random.shuffle(todo)
 
         def _fresh_page():
-            """Ferme la page courante et en ouvre une neuve pour éviter les crashes mémoire."""
+            """Ferme la page courante et en ouvre une neuve avec blocage images/médias."""
             global _current_page
             try:
                 if _current_page:
@@ -1599,6 +1590,10 @@ def run_linkedin_session(app=None) -> dict:
             except Exception:
                 pass
             p = ctx.new_page()
+            # Bloque images, vidéos, fonts → réduit RAM de ~70%
+            p.route("**/*", lambda route: route.abort()
+                if route.request.resource_type in ("image", "media", "font", "stylesheet")
+                else route.continue_())
             _current_page = p
             return p
 
