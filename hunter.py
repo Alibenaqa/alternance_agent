@@ -118,15 +118,22 @@ def _apollo_search(domaine: str) -> dict | None:
             timeout=10,
         )
 
+        print(f"   🔍 Apollo status: {resp.status_code}")
         if resp.status_code != 200:
+            print(f"   ❌ Apollo erreur HTTP {resp.status_code}: {resp.text[:200]}")
             return None
 
-        people = resp.json().get("people", [])
+        data = resp.json()
+        people = data.get("people", [])
+        print(f"   🔍 Apollo: {len(people)} personnes trouvées pour {domaine}")
+
         for person in people:
             email = person.get("email")
+            prenom = person.get("first_name", "")
+            nom    = person.get("last_name", "")
+            title  = person.get("title", "")
+            print(f"   👤 Apollo personne: {prenom} {nom} — {title} — email: {email or 'masqué'}")
             if email and "@" in email:
-                prenom = person.get("first_name", "")
-                nom    = person.get("last_name", "")
                 print(f"   ✅ Apollo email trouvé : {email} ({prenom} {nom})")
                 return {
                     "email": email,
