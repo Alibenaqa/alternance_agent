@@ -28,12 +28,15 @@ PREFIXES_RH = [
 def _smtp_check(email: str) -> bool:
     """
     Vérifie qu'un email existe via SMTP (RCPT TO) sans envoyer de message.
-    Connexion au MX du domaine, envoi EHLO + MAIL FROM + RCPT TO.
-    Retourne True si le serveur répond 250 (valide) ou 'accept_all'.
+    NOTE: Le port 25 est bloqué sur Railway et la plupart des hébergeurs cloud.
+    Cette fonction retourne toujours False dans ces environnements.
     """
+    # Détecte Railway/cloud : variable d'env RAILWAY_ENVIRONMENT ou PORT
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME"):
+        return False  # Port 25 bloqué sur Railway
+
     domaine = email.split("@")[1]
     try:
-        # Trouve le serveur MX via DNS (fallback sur le domaine directement)
         mx = _get_mx(domaine)
         if not mx:
             return False
@@ -47,7 +50,6 @@ def _smtp_check(email: str) -> bool:
 
     except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected,
             socket.timeout, ConnectionRefusedError, OSError):
-        # Serveur inaccessible → on ne peut pas valider, on retourne False
         return False
     except Exception:
         return False
@@ -56,12 +58,11 @@ def _smtp_check(email: str) -> bool:
 def _get_mx(domaine: str) -> str | None:
     """Récupère l'enregistrement MX du domaine via DNS."""
     try:
-        import dns.resolver
+        import dns.resolver  # type: ignore
         records = dns.resolver.resolve(domaine, "MX")
         mx = sorted(records, key=lambda r: r.preference)[0].exchange.to_text().rstrip(".")
         return mx
     except Exception:
-        # dnspython pas installé ou pas de MX → utilise le domaine directement
         return domaine
 
 
