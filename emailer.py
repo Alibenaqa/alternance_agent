@@ -95,6 +95,7 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
             timeout=15,
         )
 
+        print(f"   📨 Gmail API → {resp.status_code} | dest: {destinataire} | réponse: {resp.text[:300]}")
         if resp.status_code in (200, 201):
             mem = Memory()
             mem.log_email({
@@ -108,7 +109,7 @@ def envoyer_email(destinataire: str, sujet: str, corps: str, offre_id: int = Non
             print(f"   ✅ Email envoyé à {destinataire}")
             return True
         else:
-            print(f"   ❌ Erreur Gmail API : {resp.status_code} — {resp.text[:200]}")
+            print(f"   ❌ Erreur Gmail API : {resp.status_code} — {resp.text[:300]}")
             return False
 
     except Exception as e:
