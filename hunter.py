@@ -1,44 +1,181 @@
 """
-hunter.py — Trouve les emails RH d'une entreprise via Hunter.io API
+hunter.py — Trouve les emails RH d'une entreprise
+Stratégie :
+  1. Pattern guessing + validation SMTP (gratuit, sans API)
+  2. Apollo.io fallback (50 crédits/mois gratuits)
+  3. Hunter.io en dernier recours (si crédits dispo)
 """
 
 import os
+import smtplib
+import socket
 import requests
 
 HUNTER_API_KEY = os.environ.get("HUNTER_API_KEY", "25432bcf023d8760f920b39e8f4a3e96d8ef02cb")
+APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "")
 BASE_URL = "https://api.hunter.io/v2"
 
+PREFIXES_RH = [
+    "recrutement", "rh", "hr", "recruitment", "talent", "careers",
+    "emploi", "jobs", "drh", "people", "hiring",
+]
+
+
+# ─────────────────────────────────────────────────────
+# OPTION 1 : Pattern guessing + validation SMTP
+# ─────────────────────────────────────────────────────
+
+def _smtp_check(email: str) -> bool:
+    """
+    Vérifie qu'un email existe via SMTP (RCPT TO) sans envoyer de message.
+    Connexion au MX du domaine, envoi EHLO + MAIL FROM + RCPT TO.
+    Retourne True si le serveur répond 250 (valide) ou 'accept_all'.
+    """
+    domaine = email.split("@")[1]
+    try:
+        # Trouve le serveur MX via DNS (fallback sur le domaine directement)
+        mx = _get_mx(domaine)
+        if not mx:
+            return False
+
+        with smtplib.SMTP(timeout=6) as smtp:
+            smtp.connect(mx, 25)
+            smtp.ehlo("alternance-agent.fr")
+            smtp.mail("noreply@alternance-agent.fr")
+            code, _ = smtp.rcpt(email)
+            return code == 250
+
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected,
+            socket.timeout, ConnectionRefusedError, OSError):
+        # Serveur inaccessible → on ne peut pas valider, on retourne False
+        return False
+    except Exception:
+        return False
+
+
+def _get_mx(domaine: str) -> str | None:
+    """Récupère l'enregistrement MX du domaine via DNS."""
+    try:
+        import dns.resolver
+        records = dns.resolver.resolve(domaine, "MX")
+        mx = sorted(records, key=lambda r: r.preference)[0].exchange.to_text().rstrip(".")
+        return mx
+    except Exception:
+        # dnspython pas installé ou pas de MX → utilise le domaine directement
+        return domaine
+
+
+def _pattern_guess(domaine: str) -> dict | None:
+    """
+    Essaie les préfixes RH courants sur le domaine et valide via SMTP.
+    Retourne le premier email validé, ou None si aucun ne passe.
+    """
+    for prefix in PREFIXES_RH:
+        email = f"{prefix}@{domaine}"
+        if _smtp_check(email):
+            print(f"   ✅ Pattern SMTP validé : {email}")
+            return {
+                "email": email,
+                "nom": "",
+                "confiance": 60,
+                "domaine": domaine,
+                "source": "pattern_smtp",
+            }
+    return None
+
+
+# ─────────────────────────────────────────────────────
+# OPTION 2 : Apollo.io
+# ─────────────────────────────────────────────────────
+
+def _apollo_search(domaine: str) -> dict | None:
+    """
+    Cherche un email RH via Apollo.io People Search.
+    Filtre par titre RH/recrutement sur le domaine de l'entreprise.
+    Plan gratuit : 50 révélations d'emails/mois.
+    """
+    if not APOLLO_API_KEY:
+        return None
+
+    try:
+        # Recherche les personnes RH dans l'entreprise
+        resp = requests.post(
+            "https://api.apollo.io/v1/mixed_people/search",
+            json={
+                "person_titles": [
+                    "recruteur", "recruiter", "talent acquisition",
+                    "rh", "hr", "chro", "drh", "people",
+                    "talent manager", "hiring manager",
+                ],
+                "q_organization_domains": [domaine],
+                "per_page": 5,
+            },
+            headers={
+                "X-Api-Key": APOLLO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            timeout=10,
+        )
+
+        if resp.status_code != 200:
+            return None
+
+        people = resp.json().get("people", [])
+        for person in people:
+            email = person.get("email")
+            if email and "@" in email:
+                prenom = person.get("first_name", "")
+                nom    = person.get("last_name", "")
+                print(f"   ✅ Apollo email trouvé : {email} ({prenom} {nom})")
+                return {
+                    "email": email,
+                    "nom": f"{prenom} {nom}".strip(),
+                    "confiance": 75,
+                    "domaine": domaine,
+                    "source": "apollo",
+                }
+
+    except Exception as e:
+        print(f"   ⚠️ Apollo erreur : {e}")
+
+    return None
+
+
+# ─────────────────────────────────────────────────────
+# OPTION 3 : Hunter.io (si crédits disponibles)
+# ─────────────────────────────────────────────────────
 
 def _domain_search(domaine: str) -> dict | None:
-    """
-    Appelle Hunter domain-search pour un domaine.
-    Retourne UNIQUEMENT un email RH/recrutement confirmé, ou None.
-    Ne renvoie jamais un email non-RH pour éviter d'écrire au mauvais interlocuteur.
-    """
+    """Appelle Hunter domain-search pour un domaine."""
     try:
         resp = requests.get(
             f"{BASE_URL}/domain-search",
             params={
                 "domain": domaine,
                 "api_key": HUNTER_API_KEY,
-                "limit": 20,  # plus large pour maximiser les chances de trouver un RH
+                "limit": 20,
                 "type": "personal",
-                "department": "human resources",  # filtre département côté API
+                "department": "human resources",
             },
             timeout=10,
         )
         data = resp.json().get("data", {})
+
+        # Détecte épuisement des crédits Hunter
+        errors = resp.json().get("errors", [])
+        if any("quota" in str(e).lower() or "limit" in str(e).lower() for e in errors):
+            print("   ⚠️ Hunter crédits épuisés")
+            return None
+
         emails = data.get("emails", [])
         if not emails:
             return None
 
-        # Mots qui confirment que c'est un profil RH/recrutement
-        mots_rh_forts = ["rh", "hr", "recrutement", "recruitment", "talent", "people", "drh", "chro"]
+        mots_rh_forts  = ["rh", "hr", "recrutement", "recruitment", "talent", "people", "drh", "chro"]
         mots_rh_larges = ["careers", "emploi", "jobs", "hiring", "staffing", "people ops"]
-        # Mots qui disent clairement que c'est PAS RH → on rejette
-        mots_exclus = ["ceo", "cto", "coo", "cfo", "directeur", "director", "president",
-                       "commercial", "sales", "marketing", "finance", "comptable", "juridique",
-                       "legal", "communication", "it ", "dev", "engineer", "data", "tech"]
+        mots_exclus    = ["ceo", "cto", "coo", "cfo", "directeur", "director", "president",
+                          "commercial", "sales", "marketing", "finance", "comptable", "juridique",
+                          "legal", "communication", "it ", "dev", "engineer", "data", "tech"]
 
         candidats_rh = []
         for email_info in emails:
@@ -47,11 +184,9 @@ def _domain_search(domaine: str) -> dict | None:
             adresse  = (email_info.get("value") or "").lower()
             texte    = f"{nom_dep} {position} {adresse}"
 
-            # Exclure les non-RH évidents
             if any(m in texte for m in mots_exclus):
                 continue
 
-            # Score RH : plus le mot est fort, plus on priorise
             score_rh = 0
             if any(m in texte for m in mots_rh_forts):
                 score_rh = 2
@@ -64,13 +199,13 @@ def _domain_search(domaine: str) -> dict | None:
                     "nom": f"{email_info.get('first_name', '')} {email_info.get('last_name', '')}".strip(),
                     "confiance": email_info.get("confidence", 0),
                     "domaine": domaine,
+                    "source": "hunter",
                     "_score_rh": score_rh,
                 })
 
         if not candidats_rh:
-            return None  # Pas de RH trouvé → on ne renvoie rien (mieux que le mauvais destinataire)
+            return None
 
-        # Trie : score RH d'abord, puis confiance
         candidats_rh.sort(key=lambda x: (x["_score_rh"], x["confiance"]), reverse=True)
         meilleur = candidats_rh[0]
         meilleur.pop("_score_rh")
@@ -80,58 +215,63 @@ def _domain_search(domaine: str) -> dict | None:
         return None
 
 
+# ─────────────────────────────────────────────────────
+# FONCTION PRINCIPALE
+# ─────────────────────────────────────────────────────
+
 def trouver_email_recruteur(entreprise: str, domaine: str = None) -> dict | None:
     """
     Cherche l'email RH/recrutement d'une entreprise.
-    Retourne {"email": ..., "confiance": ..., "nom": ...} ou None.
-    Stratégie : domain-search .fr → domain-search .com → adresses génériques RH
+    Retourne {"email": ..., "confiance": ..., "nom": ..., "source": ...} ou None.
+
+    Stratégie :
+      1. Trouver le domaine
+      2. Pattern guessing + SMTP (gratuit)
+      3. Apollo.io (50 crédits/mois gratuits)
+      4. Hunter.io (si crédits disponibles)
     """
-    # Étape 1 : trouver le domaine si pas fourni
+    # Étape 1 : domaine
     if not domaine:
         domaine = trouver_domaine(entreprise)
     if not domaine:
         return None
 
-    # Étape 2 : domain-search sur le domaine trouvé
-    result = _domain_search(domaine)
+    print(f"   🔍 Domaine : {domaine}")
+
+    # Étape 2 : pattern guessing SMTP
+    result = _pattern_guess(domaine)
     if result:
         return result
 
-    # Étape 3 : si le domaine est .fr, essayer aussi .com (et vice versa)
+    # Variante TLD (.fr ↔ .com)
+    alt = None
     if domaine.endswith(".fr"):
         alt = domaine[:-3] + ".com"
     elif domaine.endswith(".com"):
         alt = domaine[:-4] + ".fr"
-    else:
-        alt = None
 
+    if alt:
+        result = _pattern_guess(alt)
+        if result:
+            return result
+
+    # Étape 3 : Apollo.io
+    result = _apollo_search(domaine)
+    if result:
+        return result
+    if alt:
+        result = _apollo_search(alt)
+        if result:
+            return result
+
+    # Étape 4 : Hunter.io (dernier recours)
+    result = _domain_search(domaine)
+    if result:
+        return result
     if alt:
         result = _domain_search(alt)
         if result:
             return result
-        domaine = alt  # utilise l'alt pour la suite
-
-    # Étape 4 : essayer des adresses RH génériques via email-verifier (seulement préfixes RH stricts)
-    prefixes_rh = ["recrutement", "rh", "recruitment", "talent", "careers", "emploi", "jobs", "drh", "hr"]
-    for prefix in prefixes_rh:
-        email_test = f"{prefix}@{domaine}"
-        try:
-            resp = requests.get(
-                f"{BASE_URL}/email-verifier",
-                params={"email": email_test, "api_key": HUNTER_API_KEY},
-                timeout=10,
-            )
-            statut = resp.json().get("data", {}).get("status", "")
-            if statut in ("valid", "accept_all"):
-                print(f"   ✅ Email générique trouvé : {email_test}")
-                return {
-                    "email": email_test,
-                    "nom": "",
-                    "confiance": 50,
-                    "domaine": domaine,
-                }
-        except Exception:
-            continue
 
     return None
 
@@ -248,9 +388,7 @@ def trouver_domaine(entreprise: str) -> str | None:
         if cle in nom or nom in cle:
             return domaine
 
-    # Fallback intelligent : nettoie le nom et génère plusieurs variantes
     import re as _re
-    # Supprime les mots génériques et les formes juridiques
     mots_supprimer = ["france", "group", "groupe", "sas", "sa", "sarl", "srl",
                       "inc", "llc", "ltd", "corp", "gmbh", "ag", "nv"]
     mots = nom.split()
@@ -259,12 +397,16 @@ def trouver_domaine(entreprise: str) -> str | None:
     base = _re.sub(r"[^a-z0-9]", "", base)
 
     if base:
-        return f"{base}.fr"  # préfère .fr pour les entreprises françaises
+        return f"{base}.fr"
     return None
 
 
 def verifier_email(email: str) -> bool:
-    """Vérifie qu'un email est valide avant d'envoyer."""
+    """Vérifie qu'un email est valide (SMTP ou Hunter)."""
+    # Essaie d'abord SMTP (gratuit)
+    if _smtp_check(email):
+        return True
+    # Fallback Hunter
     try:
         resp = requests.get(
             f"{BASE_URL}/email-verifier",
@@ -278,12 +420,11 @@ def verifier_email(email: str) -> bool:
 
 
 if __name__ == "__main__":
-    # Test rapide
-    entreprises = ["BoursoBank", "Capgemini", "GRDF"]
+    entreprises = ["BoursoBank", "Capgemini", "GRDF", "Doctolib"]
     for e in entreprises:
         print(f"\n🔍 {e}...")
         result = trouver_email_recruteur(e)
         if result:
-            print(f"   ✅ {result['email']} ({result['nom']}) — confiance {result['confiance']}%")
+            print(f"   ✅ {result['email']} ({result['nom']}) — confiance {result['confiance']}% — source: {result.get('source')}")
         else:
             print(f"   ❌ Aucun email trouvé")

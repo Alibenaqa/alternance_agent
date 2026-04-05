@@ -756,6 +756,19 @@ modal_label = page.evaluate("""() => {
 
 ---
 
+### 27. Hunter.io crédits épuisés
+
+**Problème :** La clé API Hunter.io n'a plus de crédits. Toutes les recherches d'emails RH retournaient None, stoppant les candidatures automatiques.
+
+**Solution :** Réécriture de `hunter.py` en 3 niveaux de fallback :
+1. **Pattern guessing + SMTP** (gratuit, sans API) : génère `rh@domain`, `recrutement@domain`, `hr@domain`... et valide via connexion SMTP directe au serveur mail (EHLO + RCPT TO sans envoyer). Pas de crédits.
+2. **Apollo.io** (fallback, 50 emails/mois gratuits) : cherche les personnes RH de l'entreprise via `POST /v1/mixed_people/search`, filtre par titres RH/recrutement. Nécessite `APOLLO_API_KEY` en variable Railway.
+3. **Hunter.io** (dernier recours) : conservé si les crédits sont rechargés.
+
+Variable Railway à ajouter : `APOLLO_API_KEY`
+
+---
+
 ### 26. Feed : 0 posts (domcontentloaded trop rapide pour React)
 
 **Problème :** `_scraper_feed` naviguait vers `/feed/` avec `wait_until="domcontentloaded"` puis cherchait immédiatement les `span[dir="ltr"]`. React n'avait pas encore rendu les posts dans le DOM — le JS retournait un tableau vide même si des posts existaient.
