@@ -244,7 +244,7 @@ def trouver_email_recruteur(entreprise: str, domaine: str = None) -> dict | None
     if not domaine:
         return None
 
-    print(f"   🔍 Domaine : {domaine}")
+    print(f"   🔍 Domaine : {domaine} | Apollo: {'✅' if APOLLO_API_KEY else '❌ clé manquante'}")
 
     # Étape 2 : pattern guessing SMTP
     result = _pattern_guess(domaine)
@@ -392,8 +392,12 @@ def trouver_domaine(entreprise: str) -> str | None:
     }
 
     nom = entreprise.lower().strip()
+    # Correspondance exacte ou mot entier uniquement (évite "ca" dans "jcdecaux")
+    import re as _re2
     for cle, domaine in DOMAINES_CONNUS.items():
-        if cle in nom or nom in cle:
+        # Vérifie que la clé apparaît comme mot entier dans le nom (pas comme sous-chaîne)
+        pattern = r'\b' + _re2.escape(cle) + r'\b'
+        if _re2.search(pattern, nom) or _re2.search(r'\b' + _re2.escape(nom) + r'\b', cle):
             return domaine
 
     import re as _re

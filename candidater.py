@@ -197,14 +197,34 @@ def candidater_wttj(offre: dict, mem: Memory) -> bool:
             page.goto(offre["url"], timeout=15000)
             page.wait_for_load_state("networkidle", timeout=10000)
 
-            # Cherche le bouton "Postuler"
-            btn = page.locator("a[href*='/apply'], button:has-text('Postuler'), a:has-text('Postuler')").first
+            # Ferme les modales/popups qui interceptent les clics (cookies, RGPD, etc.)
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+            try:
+                # Boutons de fermeture de modal courants
+                close_btn = page.locator(
+                    "button[aria-label*='lose'], button[aria-label*='ermer'], "
+                    "button[data-testid*='close'], button[data-testid*='dismiss']"
+                ).first
+                if close_btn.is_visible(timeout=2000):
+                    close_btn.click()
+            except Exception:
+                pass
+
+            # Cherche le bouton "Postuler" (clic JS pour contourner les overlays)
+            btn = page.locator(
+                "a[data-testid='job_header-button-apply'], "
+                "a[href*='/apply'], button:has-text('Postuler'), a:has-text('Postuler')"
+            ).first
             if not btn.is_visible():
                 print(f"   ❌ Bouton Postuler introuvable")
                 browser.close()
                 return False
 
-            btn.click()
+            # JS click contourne les overlays qui interceptent les pointer events
+            btn.evaluate("el => el.click()")
             page.wait_for_load_state("networkidle", timeout=10000)
 
             # Remplir le formulaire
