@@ -826,8 +826,12 @@ def run_connexions(page, nb_connexions: int) -> int:
             _log(f"   ❌ Goto search : {e}")
             continue
 
-        # Laisse React rendre les cartes (5s suffisent, pas de wait_for_selector qui cause OOM)
-        _pause(4, 5)
+        _pause(3, 4)
+        # Scroll pour déclencher le lazy-loading des cartes de résultats LinkedIn
+        page.evaluate("window.scrollBy(0, 600)")
+        _pause(2, 3)
+        page.evaluate("window.scrollBy(0, 600)")
+        _pause(1, 2)
 
         # Debug : affiche les labels de boutons pour diagnostic
         btns_debug = page.evaluate("""() => {
@@ -836,7 +840,7 @@ def run_connexions(page, nb_connexions: int) -> int:
                 .filter(t => t.length > 0)
                 .slice(0, 30);
         }""")
-        _log(f"   📋 Boutons page : {' | '.join(btns_debug[:15])}")
+        _log(f"   📋 Boutons page ({len(btns_debug)}) : {' | '.join(btns_debug[:20])}")
 
         # Clique UN bouton Connect à la fois, puis gère le modal LinkedIn
         for _ in range(nb_connexions - envoyes):
