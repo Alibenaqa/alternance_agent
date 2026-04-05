@@ -30,7 +30,7 @@ TELEGRAM_CHAT_ID  = os.environ.get("TELEGRAM_CHAT_ID", "7026975488")
 BREVO_API_KEY     = os.environ.get("BREVO_API_KEY", "")
 PROFIL_PATH       = Path(__file__).parent / "profil_ali.json"
 
-SCORE_MIN_AUTO    = 0.65   # Score minimum pour candidature automatique
+SCORE_MIN_AUTO    = 0.60   # Score minimum pour candidature automatique
 MAX_CANDIDATURES  = 10     # Max candidatures par cycle (évite le spam)
 
 
