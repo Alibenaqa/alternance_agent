@@ -914,6 +914,10 @@ def _scraper_feed(page, max_posts: int = 10) -> list[dict]:
             page.evaluate("window.scrollBy(0, 800)")
             _pause(1, 1.5)
 
+        # Debug : vérifier ce qui est dans le DOM
+        n_divs = page.evaluate("""() => document.querySelectorAll('div[dir="ltr"]').length""")
+        _log(f"   📰 div[dir=ltr] dans DOM : {n_divs}")
+
         # Approche JS directe : div[dir=ltr] > 80 chars (LinkedIn a changé span → div)
         raw_posts = page.evaluate("""(maxPosts) => {
             const results = [];
@@ -1403,6 +1407,7 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
         _pause(2, 3)
 
         # JS : extrait profils depuis liens /in/ sur la page connexions
+        # Le nom n'est PAS forcément à l'intérieur du <a> — on remonte pour le trouver
         connexions = page.evaluate("""() => {
             const seen = new Set();
             const results = [];
@@ -1410,27 +1415,53 @@ def run_messages_directs(page, nb_dms: int, app=None) -> int:
             for (const link of links) {
                 const href = link.href.split('?')[0];
                 if (!href || seen.has(href)) continue;
+                // Ignore les liens de navigation (header, footer) — doit contenir un slug /in/xxx
+                if (!href.match(/\/in\/[^\/]+\/?$/)) continue;
                 seen.add(href);
-                // Nom : span[aria-hidden=true] ou premier texte
-                const nameEl = link.querySelector('span[aria-hidden="true"]');
-                const nom = nameEl ? nameEl.innerText.trim() : link.innerText.split('\\n')[0].trim();
-                if (!nom || nom.length < 2) continue;
-                // Poste : cherche dans les éléments frères ou parents proches
+
+                // Cherche le nom dans le lien lui-même ou dans les parents proches
+                let nom = '';
                 let poste = '';
-                let el = link.parentElement;
-                for (let i = 0; i < 5; i++) {
-                    if (!el) break;
-                    const spans = [...el.querySelectorAll('span, p')];
-                    for (const s of spans) {
-                        const t = s.innerText.trim();
-                        if (t.length > 5 && t.length < 80 && t !== nom && !t.includes('•')) {
-                            poste = t;
-                            break;
+
+                // Remonte jusqu'à 8 niveaux pour trouver le container de la carte
+                let container = link;
+                for (let d = 0; d < 8; d++) {
+                    if (!container || container.tagName === 'BODY') break;
+
+                    // Nom : span[aria-hidden=true], span.visually-hidden, ou tout texte court
+                    if (!nom) {
+                        const candidates = [...container.querySelectorAll(
+                            'span[aria-hidden="true"], span.visually-hidden, span'
+                        )];
+                        for (const c of candidates) {
+                            const t = c.innerText.trim();
+                            // Nom = texte court, pas de chiffres, pas de mots-clés UI
+                            if (t.length >= 2 && t.length <= 50
+                                && !t.match(/\\d/)
+                                && !t.match(/connect|message|follow|invitation|view|voir|profil|degree|degré/i)) {
+                                nom = t;
+                                break;
+                            }
                         }
                     }
-                    if (poste) break;
-                    el = el.parentElement;
+
+                    // Poste : texte plus long dans le container
+                    if (nom && !poste) {
+                        const spans = [...container.querySelectorAll('span, p')];
+                        for (const s of spans) {
+                            const t = s.innerText.trim();
+                            if (t.length > 10 && t.length < 100 && t !== nom && !t.includes('•')) {
+                                poste = t;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (nom) break;
+                    container = container.parentElement;
                 }
+
+                if (!nom) continue;
                 results.push({ href, nom, poste });
             }
             return results.slice(0, 20);
