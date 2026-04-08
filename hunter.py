@@ -68,11 +68,26 @@ def _get_mx(domaine: str) -> str | None:
 
 def _pattern_guess(domaine: str) -> dict | None:
     """
-    Essaie les préfixes RH courants sur le domaine et valide via SMTP.
-    Retourne le premier email validé, ou None si aucun ne passe.
+    Envoie directement aux adresses RH pattern sans validation.
+    Sur Railway le port 25 est bloqué donc on skip la validation SMTP.
+    On tente les 3 préfixes les plus courants directement.
     """
-    for prefix in PREFIXES_RH:
+    # Sur Railway : envoie directement sans valider (bounce préférable à rien)
+    on_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME"))
+
+    for prefix in PREFIXES_RH[:6]:  # top 6 : recrutement, rh, hr, recruitment, talent, careers
         email = f"{prefix}@{domaine}"
+        if on_railway:
+            # Pas de validation SMTP possible → envoie directement
+            print(f"   📧 Pattern direct (sans validation) : {email}")
+            return {
+                "email": email,
+                "nom": "",
+                "confiance": 40,
+                "domaine": domaine,
+                "source": "pattern_direct",
+            }
+        # En local : valide via SMTP
         if _smtp_check(email):
             print(f"   ✅ Pattern SMTP validé : {email}")
             return {
