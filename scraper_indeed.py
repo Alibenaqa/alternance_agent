@@ -35,12 +35,11 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/122.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
+    "Accept-Language": "fr-FR,fr;q=0.9",
 }
+
+# l=France déclenche un 403 sur Railway — on boucle sur des villes IDF
+VILLES = ["Paris", "Boulogne-Billancourt", "La Défense", "Lyon", "Bordeaux"]
 
 PAUSE        = 4    # secondes entre requêtes
 OFFRES_MAX   = 40   # résultats par mot-clé (Indeed pagine par 10)
@@ -50,20 +49,18 @@ OFFRES_MAX   = 40   # résultats par mot-clé (Indeed pagine par 10)
 # FONCTIONS
 # ────────────────────────────────────────────────
 
-def fetch_page(keyword: str, start: int = 0) -> str | None:
+def fetch_page(keyword: str, ville: str = "Paris", start: int = 0) -> str | None:
     """Récupère une page de résultats Indeed."""
     params = {
-        "q":       keyword,
-        "l":       "France",
-        "sort":    "date",
-        "fromage": "30",       # 30 derniers jours
-        "start":   start,
+        "q":     keyword,
+        "l":     ville,
+        "start": start,
     }
     try:
         resp = requests.get(BASE_URL, headers=HEADERS, params=params, timeout=15)
         if resp.status_code == 200:
             return resp.text
-        print(f"   ⚠️  Indeed status {resp.status_code} pour '{keyword}' (start={start})")
+        print(f"   ⚠️  Indeed status {resp.status_code} pour '{keyword}' ({ville}, start={start})")
         return None
     except requests.RequestException as e:
         print(f"   ❌ Erreur réseau Indeed : {e}")
@@ -160,42 +157,43 @@ def scraper_indeed() -> int:
     total_nouvelles = 0
 
     for mot_cle in MOTS_CLES:
-        print(f"\n🔍 Indeed : '{mot_cle}'...")
-        start = 0
-        pages_vides = 0
+        for ville in VILLES:
+            print(f"\n🔍 Indeed : '{mot_cle}' — {ville}...")
+            start = 0
+            pages_vides = 0
 
-        while start < OFFRES_MAX:
-            html = fetch_page(mot_cle, start)
-            if not html:
-                break
-
-            offres = parser_offres(html)
-            if not offres:
-                pages_vides += 1
-                if pages_vides >= 2:
+            while start < OFFRES_MAX:
+                html = fetch_page(mot_cle, ville, start)
+                if not html:
                     break
-                time.sleep(PAUSE)
-                continue
 
-            nouvelles = 0
-            for offre in offres:
-                if mem.offre_existe(offre["url"]):
+                offres = parser_offres(html)
+                if not offres:
+                    pages_vides += 1
+                    if pages_vides >= 2:
+                        break
+                    time.sleep(PAUSE)
                     continue
-                oid = mem.add_offre(offre)
-                if oid:
-                    nouvelles += 1
-                    total_nouvelles += 1
-                    print(f"   ➕ {offre['titre']} — {offre['entreprise']}")
 
-            print(f"   📄 start={start} — {nouvelles} nouvelles / {len(offres)} offres")
+                nouvelles = 0
+                for offre in offres:
+                    if mem.offre_existe(offre["url"]):
+                        continue
+                    oid = mem.add_offre(offre)
+                    if oid:
+                        nouvelles += 1
+                        total_nouvelles += 1
+                        print(f"   ➕ {offre['titre']} — {offre['entreprise']}")
 
-            if len(offres) < 10:
-                break
+                print(f"   📄 start={start} — {nouvelles} nouvelles / {len(offres)} offres")
 
-            start += 10
+                if len(offres) < 10:
+                    break
+
+                start += 10
+                time.sleep(PAUSE)
+
             time.sleep(PAUSE)
-
-        time.sleep(PAUSE)
 
     print(f"\n✅ Indeed terminé — {total_nouvelles} nouvelles offres ajoutées.")
     return total_nouvelles

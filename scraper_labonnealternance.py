@@ -7,9 +7,7 @@ Usage:
     python scraper_labonnealternance.py
 """
 
-import time
 import requests
-from memory import Memory
 
 # ────────────────────────────────────────────────
 # CONFIGURATION
@@ -128,36 +126,12 @@ def parser_offres_matcha(data: dict) -> list[dict]:
 
 def scraper_labonnealternance() -> int:
     """
-    Lance le scraping LBA sur tous les codes ROME.
-    Retourne le nombre de nouvelles offres ajoutées.
+    API LBA (labonnealternance.apprentissage.beta.gouv.fr) — endpoint /api/v1/jobs supprimé.
+    Remplacé par alternance.emploi.gouv.fr mais sans API publique documentée.
+    Désactivé jusqu'à trouver le nouveau endpoint.
     """
-    mem = Memory()
-    total_nouvelles = 0
-
-    for rome in ROME_CODES:
-        print(f"\n🔍 La Bonne Alternance : ROME {rome}...")
-        data = fetch_offres(rome)
-        if not data:
-            continue
-
-        offres = parser_offres_pe(data) + parser_offres_matcha(data)
-        print(f"   → {len(offres)} offres récupérées")
-
-        nouvelles = 0
-        for offre in offres:
-            if mem.offre_existe(offre["url"]):
-                continue
-            oid = mem.add_offre(offre)
-            if oid:
-                nouvelles += 1
-                total_nouvelles += 1
-                print(f"   ➕ {offre['titre']} — {offre['entreprise']}")
-
-        print(f"   ✅ {nouvelles} nouvelles offres pour ROME {rome}")
-        time.sleep(PAUSE)
-
-    print(f"\n✅ La Bonne Alternance terminé — {total_nouvelles} nouvelles offres ajoutées.")
-    return total_nouvelles
+    print("⚠️  La Bonne Alternance : API /api/v1/jobs supprimée — scraper désactivé")
+    return 0
 
 
 # ────────────────────────────────────────────────

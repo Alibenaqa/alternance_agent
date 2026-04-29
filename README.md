@@ -71,21 +71,20 @@ main.py
 
 ### 3. Indeed (`scraper_indeed.py`)
 - **Méthode :** Scraping HTML avec BeautifulSoup
-- **Couverture :** France entière
-- **Filtres :** 30 derniers jours, tri par date
+- **Couverture :** Paris, Boulogne-Billancourt, La Défense, Lyon, Bordeaux (boucle de villes)
+- **Contrainte #28 :** `l=France` déclenche un 403 sur Railway — on boucle sur des villes spécifiques à la place
 - **Sélecteurs :** multiples fallbacks pour gérer les changements HTML
 
 ### 4. HelloWork (`scraper_hellowork.py`)
 - **Méthode :** Scraping HTML avec BeautifulSoup
 - **Filtre URL :** `?c=Alternance` (filtre contrat natif)
 - **Couverture :** France entière
+- **Contrainte #29 :** Structure HTML changée en 2025 — cartes = `li[data-id-storage-item-id]`, titre/entreprise extraits des `<input>` cachés du formulaire
 - **Pages :** jusqu'à 3 pages par mot-clé
 
 ### 5. La Bonne Alternance (`scraper_labonnealternance.py`)
-- **Méthode :** API gratuite beta.gouv.fr, sans authentification
-- **Codes ROME :** M1805, M1811, M1810, M1806 (dev, data, SI)
-- **Rayon :** 300 km autour de Paris
-- **Sources API :** `peJobs` (offres PE) + `matchas` (entreprises LBA)
+- **Statut :** ⚠️ **DÉSACTIVÉ** — API `/api/v1/jobs` supprimée (404) depuis migration vers `alternance.emploi.gouv.fr`
+- **Contrainte #30 :** Le nouveau domaine ne documente pas d'API publique équivalente
 
 ### 6. France Travail (`scraper_france_travail.py`)
 - **Méthode :** API officielle OAuth2 France Travail
@@ -95,10 +94,8 @@ main.py
 - **Credentials :** variables `FRANCE_TRAVAIL_CLIENT_ID` / `FRANCE_TRAVAIL_CLIENT_SECRET`
 
 ### 7. APEC (`scraper_apec.py`)
-- **Méthode :** API interne APEC (non officielle mais stable)
-- **Filtre :** contrat 204 (alternance), niveaux 634+631 (Bac+3 et Bac+2)
-- **Pagination :** jusqu'à 3 pages par mot-clé → 90 offres max
-- **Tri :** par date de publication
+- **Statut :** ⚠️ **DÉSACTIVÉ** — API `/cms/webservices/rechercheOffre/results` supprimée (404) depuis 2025
+- **Contrainte #31 :** Pas de nouveau endpoint public documenté
 
 ### 8. Alumni LinkedIn / DuckDuckGo (`alumni_linkedin.py`)
 - Voir section [Alumni Hetic](#alumni-hetic-linkedin--hunterio)

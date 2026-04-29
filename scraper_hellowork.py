@@ -73,71 +73,45 @@ def parser_offres(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     offres = []
 
-    # HelloWork utilise des articles ou des li pour les offres
-    cards = (
-        soup.find_all("article", attrs={"data-id": True}) or
-        soup.find_all("li", class_=re.compile(r"job")) or
-        soup.find_all("div", class_=re.compile(r"tw-group")) or
-        soup.find_all("article")
-    )
+    # HelloWork v2 : cartes = li[data-id-storage-item-id], données dans inputs cachés
+    cards = soup.find_all("li", attrs={"data-id-storage-item-id": True})
 
     for card in cards:
         try:
-            # Cherche le lien principal de l'offre
-            lien_el = (
-                card.find("a", attrs={"data-cy": "job-item-title"}) or
-                card.find("a", class_=re.compile(r"tw-text-b|job-title|title")) or
-                card.find("h2", class_=re.compile(r"tw-")) or
-                card.find("a", href=re.compile(r"/fr-fr/emploi/"))
-            )
-            if not lien_el:
+            job_id = card.get("data-id-storage-item-id", "")
+            if not job_id:
                 continue
 
-            # URL
-            href = lien_el.get("href", "")
-            if not href:
-                continue
-            if href.startswith("/"):
-                url = f"https://www.hellowork.com{href}"
-            else:
-                url = href
-            url = url.split("?")[0]  # enlève le tracking
+            url = f"https://www.hellowork.com/fr-fr/emplois/{job_id}.html"
 
-            # Titre
-            titre = lien_el.get_text(strip=True)
-            if not titre:
-                span = lien_el.find("span")
-                titre = span.get_text(strip=True) if span else ""
+            # Titre et entreprise via les inputs cachés du formulaire
+            titre_inp = card.find("input", attrs={"name": "title"})
+            company_inp = card.find("input", attrs={"name": "company"})
+            titre = titre_inp.get("value", "") if titre_inp else ""
+            entreprise = company_inp.get("value", "") if company_inp else ""
+
             if not titre:
                 continue
 
-            # Entreprise
-            entreprise_el = (
-                card.find("span", attrs={"data-cy": "company-name"}) or
-                card.find("p", class_=re.compile(r"company|entreprise")) or
-                card.find("span", class_=re.compile(r"tw-text-b|company"))
-            )
-            entreprise = entreprise_el.get_text(strip=True) if entreprise_el else ""
-
-            # Localisation
-            lieu_el = (
-                card.find("span", attrs={"data-cy": "location"}) or
-                card.find("span", class_=re.compile(r"location|lieu|ville")) or
-                card.find("li", class_=re.compile(r"location"))
-            )
-            localisation = lieu_el.get_text(strip=True) if lieu_el else "Paris"
-
-            # Description courte
-            desc_el = card.find("p", class_=re.compile(r"desc|summary|snippet"))
-            description = desc_el.get_text(strip=True) if desc_el else ""
+            # Localisation : premier lien ou texte contenant le département
+            # La structure est : "Ville - 75Alternance..." — on nettoie
+            texte = card.get_text(separator=" | ", strip=True)
+            localisation = ""
+            for part in texte.split("|"):
+                part = part.strip()
+                if re.search(r"\d{2}$|\d{5}|Paris|Lyon|Bordeaux|Nantes|Rennes|Lille|Marseille|Toulouse|Strasbourg", part):
+                    # Nettoie le numéro de département collé au nom de la ville
+                    localisation = re.sub(r"\s*-\s*\d{2,5}$", "", part).strip()
+                    if len(localisation) < 100:
+                        break
 
             offres.append({
                 "source":           "hellowork",
                 "url":              url,
                 "titre":            titre,
                 "entreprise":       entreprise,
-                "localisation":     localisation,
-                "description":      description,
+                "localisation":     localisation or "France",
+                "description":      "",
                 "date_publication": "",
                 "score_pertinence": 0.0,
             })

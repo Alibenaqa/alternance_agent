@@ -6,9 +6,7 @@ Usage:
     python scraper_apec.py
 """
 
-import time
 import requests
-from memory import Memory
 
 # ────────────────────────────────────────────────
 # CONFIGURATION
@@ -105,52 +103,11 @@ def parser_offres(data: dict) -> list[dict]:
 
 def scraper_apec() -> int:
     """
-    Lance le scraping APEC sur tous les mots-clés avec pagination.
-    Retourne le nombre de nouvelles offres ajoutées.
+    API APEC /cms/webservices/rechercheOffre/results — retourne 404 depuis 2025.
+    Désactivé jusqu'à trouver le nouveau endpoint.
     """
-    mem = Memory()
-    total_nouvelles = 0
-
-    for mot_cle in MOTS_CLES:
-        print(f"\n🔍 APEC : '{mot_cle}'...")
-
-        for page_num in range(PAGES_MAX):
-            debut = page_num * 30
-            data = fetch_page(mot_cle, debut)
-            if not data:
-                break
-
-            offres = parser_offres(data)
-            nb_total = data.get("totalResultats", 0)
-
-            if page_num == 0:
-                print(f"   → {nb_total} offres total, récupération par pages de 30...")
-
-            if not offres:
-                break
-
-            nouvelles = 0
-            for offre in offres:
-                if not offre["titre"] or mem.offre_existe(offre["url"]):
-                    continue
-                oid = mem.add_offre(offre)
-                if oid:
-                    nouvelles += 1
-                    total_nouvelles += 1
-                    print(f"   ➕ {offre['titre']} — {offre['entreprise']}")
-
-            print(f"   📄 Page {page_num + 1} — {nouvelles} nouvelles / {len(offres)} offres")
-
-            # Si moins de 30 résultats → dernière page
-            if len(offres) < 30:
-                break
-
-            time.sleep(PAUSE)
-
-        time.sleep(PAUSE)
-
-    print(f"\n✅ APEC terminé — {total_nouvelles} nouvelles offres ajoutées.")
-    return total_nouvelles
+    print("⚠️  APEC : API /cms/webservices supprimée — scraper désactivé")
+    return 0
 
 
 # ────────────────────────────────────────────────
