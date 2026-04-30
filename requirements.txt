@@ -9,3 +9,4 @@ google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
 google-api-python-client==2.166.0
 dnspython==2.7.0
+python-dotenv==1.1.0

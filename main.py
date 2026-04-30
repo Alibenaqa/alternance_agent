@@ -6,6 +6,8 @@ Lance le bot Telegram + le cycle agent automatique (toutes les 12h)
 import logging
 import os
 import re
+from dotenv import load_dotenv
+load_dotenv()
 import io
 import json
 from pathlib import Path
